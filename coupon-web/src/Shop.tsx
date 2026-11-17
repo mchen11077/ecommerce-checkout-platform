@@ -142,6 +142,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState(false);
   const [orderRevision, setOrderRevision] = useState(0);
+  const orderPhotos = new Map(products.map(product => [product.name, productImages[product.id]]));
   const [removeId, setRemoveId] = useState<string>();
   const [couponId, setCouponId] = useState(0);
   const [quote, setQuote] = useState<Quote>();
@@ -689,24 +690,45 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           <p>{orderPage === 0 ? 'You have no orders yet.' : 'There are no more orders.'}</p>}
         {!ordersLoading && !ordersError && orders.map(order => <details className="retail-order" key={order.orderId}>
           <summary>
-            <span>Order {order.orderId.slice(0, 8)} · {new Date(order.createdAt).toLocaleDateString()}</span>
+            <span className="retail-order-heading">
+              <b>Order {order.orderId.slice(0, 8)}</b>
+              <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleDateString()}</time>
+            </span>
             <strong>{formatMoney(order.pricing.totalCents)}</strong>
           </summary>
-          <ul>{order.items.map(item => <li key={item.name}>{item.quantity} × {item.name}</li>)}</ul>
-          <dl className="shop-total">
-            <div><dt>Subtotal</dt><dd>{formatMoney(order.pricing.subtotalCents)}</dd></div>
-            <div><dt>Discount</dt><dd>{formatMoney(order.pricing.discountCents)}</dd></div>
-            <div><dt>Total</dt><dd>{formatMoney(order.pricing.totalCents)}</dd></div>
-          </dl>
-          {order.pricing.giftName && <p>Free gift · {order.pricing.giftName}</p>}
-          {order.paymentStatus !== 'DEMO' && <div className="shop-order-status">
-            <p>{order.paymentStatus === 'REFUNDED' ? 'Refunded · simulated' : 'Paid · simulated'}</p>
-            <p>{order.shippingStatus === 'SHIPPED' ? 'Shipped · simulated' : 'Not shipped'}</p>
-            {order.paymentStatus === 'PAID' && order.shippingStatus === 'UNSHIPPED' && <div className="shop-reminder-actions">
-              <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'refund')}>Simulate refund</button>
-              <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'ship')}>Simulate shipment</button>
-            </div>}
-          </div>}
+          <div className="retail-order-details">
+            <div>
+              <ul className="retail-order-items" aria-label="Items in the order">
+                {order.items.map(item => {
+                  const photo = orderPhotos.get(item.name);
+                  return <li key={item.name}>
+                    {photo && <img src={photo} alt="" width={56} height={56} loading="lazy" />}
+                    <span><small>{item.quantity} ×</small> <strong>{item.name}</strong></span>
+                  </li>;
+                })}
+              </ul>
+              {order.pricing.giftName && <p className="shop-gift">Free gift · {order.pricing.giftName}</p>}
+            </div>
+            <div className="retail-order-receipt">
+              <dl className="shop-total">
+                <div><dt>Subtotal</dt><dd>{formatMoney(order.pricing.subtotalCents)}</dd></div>
+                {order.pricing.discountCents > 0 && <div className="retail-order-discount">
+                  <dt>Coupon discount</dt><dd>−{formatMoney(order.pricing.discountCents)}</dd>
+                </div>}
+                <div><dt>Total</dt><dd>{formatMoney(order.pricing.totalCents)}</dd></div>
+              </dl>
+              {order.paymentStatus !== 'DEMO' && <>
+                <div className="retail-order-status">
+                  <span data-state={order.paymentStatus}>{order.paymentStatus === 'REFUNDED' ? 'Refunded · simulated' : 'Paid · simulated'}</span>
+                  <span data-state={order.shippingStatus}>{order.shippingStatus === 'SHIPPED' ? 'Shipped · simulated' : 'Not shipped'}</span>
+                </div>
+                {order.paymentStatus === 'PAID' && order.shippingStatus === 'UNSHIPPED' && <div className="shop-reminder-actions">
+                  <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'refund')}>Simulate refund</button>
+                  <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'ship')}>Simulate shipment</button>
+                </div>}
+              </>}
+            </div>
+          </div>
         </details>)}
         {userId !== null && (orderPage > 0 || orders.length === 20) && <div className="retail-order-pages">
           <button type="button" disabled={ordersLoading || orderPage === 0}
