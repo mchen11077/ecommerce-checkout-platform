@@ -2,20 +2,10 @@ name: Coupon CI
 
 on:
   push:
-    paths:
-      - 'coupon/**'
-      - '.github/workflows/coupon.yml'
   pull_request:
-    paths:
-      - 'coupon/**'
-      - '.github/workflows/coupon.yml'
 
 permissions:
   contents: read
-
-defaults:
-  run:
-    working-directory: coupon
 
 jobs:
   backend:
@@ -45,14 +35,14 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: coupon/app/pom.xml
+          cache-dependency-path: app/pom.xml
       - name: Test with coverage
-        working-directory: coupon/app
+        working-directory: app
         run: mvn -B org.jacoco:jacoco-maven-plugin:0.8.13:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.13:report
       - uses: actions/upload-artifact@v4
         with:
           name: java-coverage
-          path: coupon/app/target/site/jacoco/
+          path: app/target/site/jacoco/
           if-no-files-found: error
 
   frontend:
@@ -67,8 +57,8 @@ jobs:
           node-version: '22'
           cache: pnpm
           cache-dependency-path: |
-            coupon/coupon-client/pnpm-lock.yaml
-            coupon/coupon-web/pnpm-lock.yaml
+            coupon-client/pnpm-lock.yaml
+            coupon-web/pnpm-lock.yaml
       - name: Test and build the client and storefront
         run: |
           for package in coupon-client coupon-web; do
@@ -116,7 +106,7 @@ jobs:
         with:
           version: 10.34.9
       - name: Install browser tests
-        working-directory: coupon/e2e
+        working-directory: e2e
         run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
       - name: Rehearse the release
         shell: pwsh
@@ -125,5 +115,5 @@ jobs:
         if: failure()
         with:
           name: browser-test-results
-          path: coupon/e2e/test-results
+          path: e2e/test-results
           if-no-files-found: ignore
