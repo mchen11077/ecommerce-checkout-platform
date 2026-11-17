@@ -2,9 +2,8 @@
 
 TypeScript client for the coupon service.
 
-The API answers every request with an HTTP status and a `result` string in the body. This client turns
-that pair into a typed value on success and a `CouponApiError` on rejection, so call sites switch on
-`SOLD_OUT` or `EXPIRED` instead of on status codes.
+Coupon operations return a typed `result` on success. On rejection, `CouponApiError` exposes the
+service's result code and HTTP status.
 
 ```ts
 import { CouponApiError, CouponClient } from '@xumeiqi/coupon-client';
@@ -12,17 +11,10 @@ import { CouponApiError, CouponClient } from '@xumeiqi/coupon-client';
 const coupons = new CouponClient({ baseUrl: 'http://localhost:8080' });
 
 try {
-  await coupons.claim(7, userId);
+  await coupons.claim(7, 101);
 } catch (error) {
   if (error instanceof CouponApiError) {
-    switch (error.code) {
-      case 'SOLD_OUT':
-        return 'This coupon is gone';
-      case 'ALREADY_CLAIMED':
-        return 'You already have this one';
-      case 'LOCK_TIMEOUT':
-        return 'Busy right now, try again';
-    }
+    console.error(error.code, error.status);
   }
   throw error;
 }
@@ -44,8 +36,7 @@ Rejections throw one of:
 
 ## Notes
 
-- `orderAmount` accepts a string on purpose. Passing `49.99` as a number goes through `toString()` and
-  loses the scale that the server's `BigDecimal` parameter cares about.
+- Pass `orderAmount` as a decimal string to preserve its exact text, for example `"49.99"`.
 - No runtime dependencies. `fetch` can be injected for tests or for custom headers.
 - One `AbortController` covers both the internal timeout and a caller-supplied `signal`.
 

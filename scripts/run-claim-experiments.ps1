@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "Docker engine is not running. Start Docke
 Say "Removing old containers and data, then building and starting (first run downloads images, can take 5-10 min)"
 docker compose --profile test down -v --remove-orphans
 docker compose up -d --build
-if ($LASTEXITCODE -ne 0) { Stop-Transcript | Out-Null; throw "docker compose up failed (if this is a Java compile error, send me results\run_log.txt)" }
+if ($LASTEXITCODE -ne 0) { Stop-Transcript | Out-Null; throw "docker compose up failed (see results\run_log.txt)" }
 docker compose --profile test pull k6
 
 function Wait-App {

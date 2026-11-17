@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CouponApiError, CouponClient } from '@xumeiqi/coupon-client';
+import { isCartQuantity, MAX_QUANTITY, type CartLine } from './cart';
+import { ShoppingCart } from './components/ShoppingCart';
+import { formatMoney } from './formatMoney';
 import { copyFor } from './messages';
 import { clearPendingCheckout, readPendingCheckout, savePendingCheckout } from './pendingCheckout';
 import { useResourceList } from './useResourceList';
@@ -48,7 +51,6 @@ interface Pricing {
 }
 
 interface Product { id: string; name: string; cents: number; category: string; description: string }
-interface CartLine { productId: string; quantity: number; checked: boolean }
 interface Receipt { orderId: string; pricing: Pricing }
 interface OrderSummary extends Receipt {
   createdAt: string;
@@ -66,7 +68,6 @@ export interface BrowserSession {
 
 const configuredApi = (import.meta.env.VITE_API_BASE ?? window.location.origin).replace(/\/+$/, '');
 const loginPath = '/oauth2/authorization/coupon';
-const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const initialOfferCount = 3;
 const cartStorageKey = 'kitchenware-cart-v1';
 
@@ -77,7 +78,7 @@ function readCart(): CartLine[] {
     const seen = new Set<string>();
     return stored.filter((line): line is CartLine => {
       if (!line || typeof line.productId !== 'string' || seen.has(line.productId) ||
-        !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 99 ||
+        !isCartQuantity(line.quantity) ||
         typeof line.checked !== 'boolean') return false;
       seen.add(line.productId);
       return true;
@@ -85,10 +86,6 @@ function readCart(): CartLine[] {
   } catch {
     return [];
   }
-}
-
-function formatMoney(cents: number) {
-  return money.format(cents / 100);
 }
 
 function minimumShortfall(coupon: Coupon, subtotal: number) {
@@ -195,10 +192,11 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   });
   const checkedLines = lines.filter(line => line.checked);
   const cartKey = selectedCartKey(lines);
-  const allChecked = lines.length > 0 && checkedLines.length === lines.length;
-  const selectedQuantity = checkedLines.reduce((sum, line) => sum + line.quantity, 0);
   const cartSubtotal = checkedLines.reduce((sum, line) => sum + line.product.cents * line.quantity, 0);
   const currentQuote = quote?.couponId === selectedId && quote?.cartKey === cartKey ? quote?.pricing : undefined;
+  const checkoutBlocked = busy || Boolean(removeId);
+  const canStartCheckout = !checkoutBlocked && productsLoad === 'ready' && Boolean(cartKey)
+    && (!selected || currentQuote?.result === 'ELIGIBLE');
   const subtotal = currentQuote?.subtotalCents ?? cartSubtotal;
   const discount = currentQuote?.discountCents ?? 0;
   const shortfall = currentQuote?.shortfallCents ?? 0;
@@ -311,7 +309,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
 
   function addToCart(product: Product) {
     const existing = cart.find(line => line.productId === product.id);
-    if (existing?.quantity === 99) return;
+    if (existing?.quantity === MAX_QUANTITY) return;
     const next = existing
       ? cart.map(line => line === existing ? { ...line, checked: true, quantity: line.quantity + 1 } : line)
       : [...cart, { productId: product.id, quantity: 1, checked: true }];
@@ -345,9 +343,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   }
 
   async function placeOrder(withoutCouponConfirmed = false) {
-    if (submittingOrder.current || busy || removeId) return;
-    if (!pendingCheckout && (!cartKey || productsLoad !== 'ready' ||
-      (selected && currentQuote?.result !== 'ELIGIBLE'))) return;
+    if (submittingOrder.current || checkoutBlocked || (!pendingCheckout && !canStartCheckout)) return;
     if (!pendingCheckout && !selected && hasUsableCoupon && !withoutCouponConfirmed) {
       setShowCouponReminder(true);
       return;
@@ -496,7 +492,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
               </div>
               <button type="button" className="button-primary" disabled={cartLocked || Boolean(removeId)
                 || stock[product.id] === 0
-                || cart.some(line => line.productId === product.id && line.quantity === 99)}
+                || cart.some(line => line.productId === product.id && line.quantity === MAX_QUANTITY)}
                 aria-label={`Add ${product.name} to cart`} onClick={() => addToCart(product)}>Add to cart</button>
             </article>)}
         </div>
@@ -531,10 +527,10 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                 <div className="shop-offer-details">
                   <h3>{coupon.name}</h3>
                   {(coupon.discountAmount > 0 || coupon.giftName) && <p className="shop-offer-value">
-                    {coupon.discountAmount > 0 && <span className="shop-offer-discount">{money.format(coupon.discountAmount)} off</span>}
+                    {coupon.discountAmount > 0 && <span className="shop-offer-discount">{formatMoney(Math.round(coupon.discountAmount * 100))} off</span>}
                     {coupon.giftName && <span className="shop-offer-gift">{coupon.discountAmount > 0 ? '+ Free ' : 'Free '}{coupon.giftName}</span>}
                   </p>}
-                  <p>Orders from {money.format(coupon.minOrderAmount)}</p>
+                  <p>Orders from {formatMoney(Math.round(coupon.minOrderAmount * 100))}</p>
                   <p>Ends <time dateTime={coupon.validUntil}>{new Date(coupon.validUntil).toLocaleDateString()}</time></p>
                   {recommended?.id === coupon.id && <p className="shop-recommended">
                     Recommended for {checkedLines.length === 1 ? checkedLines[0]?.product.name : 'selected items'}
@@ -599,51 +595,15 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
             <h2>Checkout</h2>
             <p>Demo order · No payment required</p>
           </header>
-          <fieldset disabled={cartLocked || productsLoad !== 'ready'}>
-            <legend>Shopping cart</legend>
-            {lines.length > 0 ? <div className="shop-cart-toolbar"><label className="shop-select-all">
-              <input type="checkbox" checked={allChecked} ref={input => {
-                if (input) input.indeterminate = checkedLines.length > 0 && !allChecked;
-              }} onChange={event => updateCart(lines.map(line => ({ ...line, checked: event.target.checked })))} />
-              Select all items
-            </label><span aria-live="polite">{selectedQuantity} selected</span></div> : <p>Your cart is empty.</p>}
-            {lines.map(({ product, productId, quantity, checked }) => (
-              <div className="shop-product" key={productId}>
-                <label>
-                  <input type="checkbox" checked={checked} onChange={event => updateCart(lines.map(line =>
-                    line.productId === productId ? { ...line, checked: event.target.checked } : line))} />
-                  <span className="shop-product-name">
-                    <strong>{product.name}</strong>
-                    <small>{formatMoney(product.cents)} each</small>
-                  </span>
-                </label>
-                <strong className="shop-line-total">{formatMoney(product.cents * quantity)}</strong>
-                <div className="shop-cart-controls">
-                  <div className="shop-quantity">
-                  <button type="button" aria-label={`Decrease ${product.name} quantity`} disabled={quantity === 1 || Boolean(removeId)}
-                    onClick={() => updateCart(lines.map(line => line.productId === productId ? { ...line, quantity: quantity - 1 } : line))}>−</button>
-                  <span aria-label={`${product.name} quantity`}>{quantity}</span>
-                  <button type="button" aria-label={`Increase ${product.name} quantity`} disabled={quantity === 99 || Boolean(removeId)}
-                    onClick={() => updateCart(lines.map(line => line.productId === productId ? { ...line, quantity: quantity + 1 } : line))}>+</button>
-                  </div>
-                  <button className="shop-cart-remove" type="button" aria-label={`Remove ${product.name}`} disabled={Boolean(removeId)}
-                    onClick={() => setRemoveId(productId)}>Remove</button>
-                </div>
-                {removeId === productId && <div className="shop-cart-confirm" role="group" aria-label={`Remove ${product.name}?`}>
-                  <p>Remove {product.name} from your cart?</p>
-                  <button type="button" onClick={() => setRemoveId(undefined)}>Keep item</button>
-                  <button type="button" onClick={() => {
-                    updateCart(lines.filter(line => line.productId !== productId));
-                    setRemoveId(undefined);
-                  }}>Confirm removal</button>
-                </div>}
-              </div>
-            ))}
-            {lines.length === 0 && <a href="#products">Browse products</a>}
-          </fieldset>
+          <ShoppingCart
+            lines={lines}
+            disabled={cartLocked || productsLoad !== 'ready'}
+            removeId={removeId}
+            onRemoveChange={setRemoveId}
+            onChange={updateCart}
+          />
           <div className="shop-checkout-summary">
           <h3>Order summary</h3>
-          <p>Payment is simulated. No payment details are needed.</p>
           {userId !== null && !pendingCheckout && <div className="shop-coupon-picker">
             <span id="coupon-label">Coupon</span>
             <details ref={couponPicker} onKeyDown={event => {
@@ -680,8 +640,8 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           {!pendingCheckout && <dl className="shop-total" aria-label="Order totals">
             <div><dt>Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>
             {discount > 0 && <div key={discount} className="shop-savings">
-              <dt>{discount > 0 ? 'You save' : 'Coupon discount'}</dt>
-              <dd>{discount > 0 ? '−' : ''}{formatMoney(discount)}</dd>
+              <dt>You save</dt>
+              <dd>−{formatMoney(discount)}</dd>
             </div>}
             <div><dt>Total</dt><dd>{formatMoney(currentQuote?.totalCents ?? subtotal)}</dd></div>
           </dl>}
@@ -696,18 +656,16 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                 couponPicker.current?.setAttribute('open', '');
                 couponTrigger.current?.focus();
               }}>Choose a coupon</button>
-              <button type="button" disabled={busy || productsLoad !== 'ready' || Boolean(removeId)}
+              <button type="button" disabled={!canStartCheckout}
                 onClick={() => void placeOrder(true)}>Continue without a coupon</button>
             </div>
           </div> : userId === null ? <div className="shop-guest-checkout">
             <p>Sign in to use coupons.</p>
             <a href={loginPath}>Sign in</a>
-            <button className="button-primary" type="button" disabled={busy || Boolean(removeId)
-              || productsLoad !== 'ready' || !cartKey}
+            <button className="button-primary" type="button" disabled={!canStartCheckout}
               onClick={() => void placeOrder()}>Continue as guest</button>
           </div> : <button className="button-primary" type="button"
-            disabled={busy || Boolean(removeId) || productsLoad !== 'ready' || !cartKey
-              || Boolean(selected && currentQuote?.result !== 'ELIGIBLE')}
+            disabled={!canStartCheckout}
             aria-label="Confirm demo order"
             onClick={() => void placeOrder()}>
               <span>Confirm demo order</span><strong aria-hidden="true">{formatMoney(currentQuote?.totalCents ?? subtotal)}</strong>

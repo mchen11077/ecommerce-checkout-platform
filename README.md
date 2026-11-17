@@ -1,21 +1,28 @@
-# Paw & Pantry — Full-Stack E-Commerce Platform
+# Paw & Pantry
 
-A full-stack coupon and checkout project with **Paw & Pantry**, a kitchenware storefront. Shoppers can browse products, claim offers, check out with selected cart items, and view their orders. Payment, refunds, and shipment are simulated.
+Paw & Pantry is a full-stack kitchenware store built with React, TypeScript, Spring Boot, and PostgreSQL. Shoppers can browse products, select which cart items to buy, apply a coupon at checkout, and view their order history. Payment, refunds, and shipping are simulated.
 
-## Engineering highlights
+## Architecture
 
-| Scenario | Behavior |
+```text
+React storefront ── Nginx ── Spring Boot API ── PostgreSQL
+                              │
+                              └── Keycloak (OpenID Connect)
+```
+
+| Directory | Contents |
 | --- | --- |
-| Checkout response is lost | The browser retries with the same order ID and cart contents. The server returns the existing receipt and deducts stock once. |
-| A later cart item is out of stock | PostgreSQL rolls back the order and earlier inventory updates. Any coupon remains available for a retry. |
-| Refund and shipment race | An order row lock serializes the actions. Exactly one succeeds, and a refund restores stock once. |
-| Coupon offers are unavailable | The product catalog stays usable. Shoppers can retry loading offers separately. |
+| [app](app) | Java 21 API, coupon eligibility and redemption, checkout transactions, and order history |
+| [coupon-web](coupon-web) | React storefront and component tests |
+| [coupon-client](coupon-client) | Typed client for coupon operations |
+| [e2e](e2e) | Playwright acceptance tests |
+| [deploy](deploy) | Docker Compose, local identity fixture, and database migrations |
 
-**Stack:** React, TypeScript, Spring Boot, Java 21, PostgreSQL, Keycloak, and Docker Compose. A separate load-test setup uses Redis, Kafka, nginx, and k6 to compare coupon-claim implementations.
+The storefront uses PostgreSQL for claims. The [coupon claim experiments](docs/claim-experiments.md) use a separate Docker stack to compare claim implementations with Redis, Kafka, and k6.
 
 ## Run locally
 
-Start Docker Desktop, then run from the repository root in PowerShell.
+Install Docker with Compose v2. Run the following from the repository root in PowerShell.
 
 ```powershell
 $compose = @('--project-directory', '.', '-p', 'coupon-demo', '--env-file', 'deploy/rehearsal.env',
@@ -25,15 +32,21 @@ Get-Content -Raw deploy/retail-offers.sql |
   docker compose @compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U coupon -d coupon
 ```
 
-Open **http://localhost:5186**. Rehearsal accounts are defined in the [local identity fixture](deploy/keycloak/coupons-realm.json). For a quick demo, add the $50 skillet and $25 utensil set, then apply **Kitchen starter savings**. The $10 discount brings the total to **$65**.
+Open [localhost:5186](http://localhost:5186) and sign in with a [local demo account](deploy/keycloak/coupons-realm.json). Add the $50 skillet and $25 utensil set, claim **Kitchen starter savings**, and apply it at checkout. The $10 discount brings the total to $65. The receipt appears under **My orders**.
 
-```powershell
-docker compose @compose stop
-```
+Stop the stack with `docker compose @compose stop`. For release verification commands, see the [release guide](deploy/README.md).
 
-## Tests and documentation
+## Checkout behavior
 
-- [GitHub Actions workflow](.github/workflows/coupon.yml) runs Java and TypeScript tests, checkout API integration checks, and a browser rehearsal.
-- [PostgreSQL checkout tests](app/src/test/java/com/coursework/coupon/CheckoutPostgresTest.java) cover rollback and both outcomes of a refund/shipment race. Set `CHECKOUT_TEST_JDBC_URL`, `CHECKOUT_TEST_DB_USER`, and `CHECKOUT_TEST_DB_PASSWORD` to a disposable database before running `mvn test` in `app`.
-- [Coupon claim experiments](docs/claim-experiments.md) documents the Redis and Kafka implementations and local performance runs.
-- [Image credits](coupon-web/public/photo-credits.html).
+- **Retry after a lost response.** The browser reuses the order ID and original cart contents after a refresh in the same tab. The API returns the existing receipt without deducting inventory again.
+- **Insufficient inventory.** If one selected item cannot be reserved, PostgreSQL rolls back the order and any earlier stock deductions. The coupon remains available.
+- **Refund and shipment.** Both operations lock the same order row. If they race, only one succeeds. A refund restores the stock once.
+
+## Tests
+
+[Coupon CI](.github/workflows/coupon.yml) runs Java and TypeScript tests, checkout API checks against Docker services, and a Chromium release rehearsal. The Java job uploads a JaCoCo report.
+
+- Run Java unit and controller tests with `mvn -f app/pom.xml test`. For the [PostgreSQL checkout cases](app/src/test/java/com/coursework/coupon/CheckoutPostgresTest.java), set `CHECKOUT_TEST_JDBC_URL`, `CHECKOUT_TEST_DB_USER`, and `CHECKOUT_TEST_DB_PASSWORD` to a test database whose user can create schemas.
+- See [storefront development](coupon-web/README.md) for the frontend build and test commands.
+
+[Image credits](coupon-web/public/photo-credits.html)

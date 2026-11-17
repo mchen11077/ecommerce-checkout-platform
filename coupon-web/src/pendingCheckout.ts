@@ -1,12 +1,9 @@
-export interface CheckoutItem {
-  productId: string;
-  quantity: number;
-}
+import { isCartQuantity, type CartItem } from './cart';
 
 export interface PendingCheckout {
   orderId: string;
   couponId: number | null;
-  items: CheckoutItem[];
+  items: CartItem[];
 }
 
 function key(owner: number | null) {
@@ -20,7 +17,7 @@ export function readPendingCheckout(owner: number | null): PendingCheckout | und
       (stored.couponId !== null && (!Number.isSafeInteger(stored.couponId) || stored.couponId < 1 || owner === null)) ||
       !Array.isArray(stored.items) || !stored.items.length ||
       stored.items.some(item => !item || typeof item.productId !== 'string' || !item.productId ||
-        !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) ||
+        !isCartQuantity(item.quantity)) ||
       new Set(stored.items.map(item => item.productId)).size !== stored.items.length) return undefined;
     return stored;
   } catch {
