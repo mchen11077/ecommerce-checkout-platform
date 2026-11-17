@@ -1,0 +1,72 @@
+{
+  "realm": "coupons",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "roles": { "realm": [{ "name": "coupon.customer" }] },
+  "clients": [
+    {
+      "clientId": "coupon-shop",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "local-coupon-shop-demo-only",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5176/login/oauth2/code/coupon", "http://localhost:5186/login/oauth2/code/coupon"],
+      "attributes": { "post.logout.redirect.uris": "http://localhost:5176/##http://localhost:5186/" },
+      "protocolMappers": [
+        {
+          "name": "coupon-user-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "coupon_user_id",
+            "claim.name": "coupon_user_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "coupon-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "coupon_roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "shopper-a",
+      "enabled": true,
+      "firstName": "Shopper",
+      "lastName": "A",
+      "email": "shopper-a@example.invalid",
+      "emailVerified": true,
+      "attributes": { "coupon_user_id": ["201"] },
+      "realmRoles": ["coupon.customer"],
+      "credentials": [{ "type": "password", "value": "LocalShopperA-201!", "temporary": false }]
+    },
+    {
+      "username": "shopper-b",
+      "enabled": true,
+      "firstName": "Shopper",
+      "lastName": "B",
+      "email": "shopper-b@example.invalid",
+      "emailVerified": true,
+      "attributes": { "coupon_user_id": ["202"] },
+      "realmRoles": ["coupon.customer"],
+      "credentials": [{ "type": "password", "value": "LocalShopperB-202!", "temporary": false }]
+    }
+  ]
+}

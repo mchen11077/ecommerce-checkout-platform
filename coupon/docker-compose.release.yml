@@ -1,0 +1,61 @@
+services:
+  migrate:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: ${COUPON_DB_HOST:?Set COUPON_DB_HOST}
+      PGPORT: ${COUPON_DB_PORT:-5432}
+      PGDATABASE: ${COUPON_DB_NAME:?Set COUPON_DB_NAME}
+      PGUSER: ${COUPON_DB_MIGRATION_USER:?Set COUPON_DB_MIGRATION_USER}
+      PGPASSWORD: ${COUPON_DB_MIGRATION_PASSWORD:?Set COUPON_DB_MIGRATION_PASSWORD}
+      PGSSLMODE: ${COUPON_DB_SSLMODE:-verify-full}
+    volumes:
+      - ./deploy/migrate.sql:/sql/deploy/migrate.sql:ro
+      - ./app/src/main/resources/schema.sql:/sql/app/src/main/resources/schema.sql:ro
+    command: ["psql", "-X", "-f", "/sql/deploy/migrate.sql"]
+
+  app:
+    image: ${COUPON_APP_IMAGE:-coupon-release-app:local}
+    build: ./app
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SPRING_PROFILES_ACTIVE: production,browser-login
+      COUPON_DB_URL: ${COUPON_DB_URL:?Set COUPON_DB_URL}
+      COUPON_DB_USERNAME: ${COUPON_DB_USERNAME:?Set COUPON_DB_USERNAME}
+      COUPON_DB_PASSWORD: ${COUPON_DB_PASSWORD:?Set COUPON_DB_PASSWORD}
+      COUPON_JWT_ISSUER: ${COUPON_LOGIN_ISSUER:?Set COUPON_LOGIN_ISSUER}
+      COUPON_JWT_AUDIENCE: ${COUPON_LOGIN_CLIENT_ID:?Set COUPON_LOGIN_CLIENT_ID}
+      COUPON_LOGIN_ISSUER: ${COUPON_LOGIN_ISSUER:?Set COUPON_LOGIN_ISSUER}
+      COUPON_LOGIN_BACKCHANNEL: ${COUPON_LOGIN_BACKCHANNEL:?Set COUPON_LOGIN_BACKCHANNEL}
+      COUPON_LOGIN_ORIGIN: ${COUPON_LOGIN_ORIGIN:?Set COUPON_LOGIN_ORIGIN}
+      COUPON_LOGIN_CLIENT_ID: ${COUPON_LOGIN_CLIENT_ID:?Set COUPON_LOGIN_CLIENT_ID}
+      COUPON_LOGIN_CLIENT_SECRET: ${COUPON_LOGIN_CLIENT_SECRET:?Set COUPON_LOGIN_CLIENT_SECRET}
+      COUPON_SESSION_SECURE: ${COUPON_SESSION_SECURE:-true}
+      MANAGEMENT_SERVER_PORT: "8081"
+      COUPON_INTERNAL_METRICS: "true"
+
+  web:
+    image: ${COUPON_WEB_IMAGE:-coupon-release-web:local}
+    build:
+      context: .
+      dockerfile: deploy/Web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "127.0.0.1:${COUPON_WEB_PORT:-8088}:80"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - metrics:/prometheus
+    ports:
+      - "127.0.0.1:${COUPON_METRICS_PORT:-9090}:9090"
+
+volumes:
+  metrics:

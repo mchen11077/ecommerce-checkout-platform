@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: ${COUPON_DB_URL}
+    username: ${COUPON_DB_USERNAME}
+    password: ${COUPON_DB_PASSWORD}
+  sql:
+    init:
+      mode: never
+  kafka:
+    listener:
+      auto-startup: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${COUPON_JWT_ISSUER}
+          audiences:
+            - ${COUPON_JWT_AUDIENCE}
+management:
+  health:
+    redis:
+      enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+coupon:
+  claim:
+    durable: true

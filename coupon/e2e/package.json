@@ -1,0 +1,7 @@
+{
+  "name": "coupon-release-e2e",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}

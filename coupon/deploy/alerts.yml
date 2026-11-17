@@ -1,0 +1,24 @@
+groups:
+  - name: coupon
+    rules:
+      - alert: CouponScrapeUnavailable
+        expr: up{job="coupon"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: Coupon application metrics are unreachable
+      - alert: CouponDatabasePoolSaturated
+        expr: hikaricp_connections_pending{job="coupon"} > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: Requests are waiting for a database connection
+      - alert: CouponServerErrors
+        expr: sum(rate(http_server_requests_seconds_count{job="coupon",status=~"5.."}[5m])) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Coupon application is returning server errors

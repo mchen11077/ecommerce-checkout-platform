@@ -1,0 +1,61 @@
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 400
+    accept-count: 2000
+    max-connections: 20000
+spring:
+  # Set VIRTUAL_THREADS=true to run each request on a virtual thread (Tomcat's 400-thread pool is bypassed).
+  threads:
+    virtual:
+      enabled: ${VIRTUAL_THREADS:false}
+  datasource:
+    url: jdbc:postgresql://postgres:5432/coupon
+    username: coupon
+    password: coupon
+    hikari:
+      maximum-pool-size: 30
+  sql:
+    init:
+      mode: always
+  data:
+    redis:
+      host: redis
+      port: 6379
+  kafka:
+    bootstrap-servers: kafka:9092
+    producer:
+      # acks=all + idempotence closes the "leader died before replicating" loss window. Sends are async,
+      # so the extra round trip costs throughput only when a batch is actually flushed.
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        linger.ms: 5
+    consumer:
+      group-id: coupon-persist
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 500
+coupon:
+  consumer:
+    batch: false   # Step 4.4: true = batch insert. Overridden by env COUPON_CONSUMER_BATCH.
+    concurrency: ${CONSUMER_CONCURRENCY:6}   # threads per instance; needs enough partitions to be useful
+  kafka:
+    partitions: ${KAFKA_PARTITIONS:12}
+    key-mode: ${KAFKA_KEY_MODE:user}          # user = spread a hot coupon; coupon = one partition per coupon
+  rate-limit:
+    max-per-window: 5
+    window-ms: 1000
+    combined: ${COMBINED_RATE_LIMIT:true}     # one Lua call instead of rate-limit + claim
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+logging:
+  level:
+    org.apache.kafka: WARN

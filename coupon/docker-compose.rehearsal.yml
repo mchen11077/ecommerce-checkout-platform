@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: coupon
+      POSTGRES_USER: coupon
+      POSTGRES_PASSWORD: ${COUPON_DB_MIGRATION_PASSWORD:?Set rehearsal environment}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coupon -d coupon"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - database:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HOSTNAME: http://localhost:8186
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "127.0.0.1:8186:8080"
+    volumes:
+      - ./keycloak/coupons-realm.json:/opt/keycloak/data/import/coupons-realm.json:ro
+
+  migrate:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  database:

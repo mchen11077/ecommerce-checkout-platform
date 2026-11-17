@@ -1,0 +1,37 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./keycloak/coupons-realm.json:/opt/keycloak/data/import/coupons-realm.json:ro
+      - login_identity:/opt/keycloak/data
+
+  app:
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx512m"
+      SPRING_PROFILES_ACTIVE: production,browser-login
+      SPRING_SQL_INIT_MODE: always
+      COUPON_DB_URL: jdbc:postgresql://postgres:5432/coupon
+      COUPON_DB_USERNAME: coupon
+      COUPON_DB_PASSWORD: coupon
+      COUPON_JWT_ISSUER: http://localhost:8180/realms/coupons
+      COUPON_JWT_AUDIENCE: coupon-shop
+      COUPON_LOGIN_ISSUER: http://localhost:8180/realms/coupons
+      COUPON_LOGIN_BACKCHANNEL: http://keycloak:8080/realms/coupons
+      COUPON_LOGIN_ORIGIN: http://localhost:5176
+      COUPON_LOGIN_CLIENT_ID: coupon-shop
+      COUPON_LOGIN_CLIENT_SECRET: local-coupon-shop-demo-only
+      COUPON_SESSION_SECURE: "false"
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+volumes:
+  login_identity:

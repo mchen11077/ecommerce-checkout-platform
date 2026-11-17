@@ -1,0 +1,15 @@
+server:
+  servlet:
+    session:
+      cookie:
+        name: COUPON_SESSION
+        http-only: true
+        secure: ${COUPON_SESSION_SECURE:true}
+        same-site: lax
+coupon:
+  login:
+    issuer: ${COUPON_LOGIN_ISSUER}
+    backchannel: ${COUPON_LOGIN_BACKCHANNEL}
+    origin: ${COUPON_LOGIN_ORIGIN}
+    client-id: ${COUPON_LOGIN_CLIENT_ID}
+    client-secret: ${COUPON_LOGIN_CLIENT_SECRET}

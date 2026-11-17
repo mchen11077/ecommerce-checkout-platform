@@ -1,0 +1,129 @@
+name: Coupon CI
+
+on:
+  push:
+    paths:
+      - 'coupon/**'
+      - '.github/workflows/coupon.yml'
+  pull_request:
+    paths:
+      - 'coupon/**'
+      - '.github/workflows/coupon.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: coupon
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: checkout_test
+          POSTGRES_USER: checkout_test
+          POSTGRES_PASSWORD: checkout-test
+        options: >-
+          --health-cmd "pg_isready -U checkout_test -d checkout_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+        ports:
+          - 5432:5432
+    env:
+      CHECKOUT_TEST_JDBC_URL: jdbc:postgresql://127.0.0.1:5432/checkout_test
+      CHECKOUT_TEST_DB_USER: checkout_test
+      CHECKOUT_TEST_DB_PASSWORD: checkout-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: coupon/app/pom.xml
+      - name: Test with coverage
+        working-directory: coupon/app
+        run: mvn -B org.jacoco:jacoco-maven-plugin:0.8.13:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.13:report
+      - uses: actions/upload-artifact@v4
+        with:
+          name: java-coverage
+          path: coupon/app/target/site/jacoco/
+          if-no-files-found: error
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: |
+            coupon/coupon-client/pnpm-lock.yaml
+            coupon/coupon-web/pnpm-lock.yaml
+      - name: Test and build the client and storefront
+        run: |
+          for package in coupon-client coupon-web; do
+            pnpm --dir "$package" install --frozen-lockfile
+            pnpm --dir "$package" test
+            pnpm --dir "$package" build
+          done
+
+  checkout-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start checkout dependencies
+        run: docker compose up -d --build postgres redis kafka app
+      - name: Wait for backend and claim consumer
+        run: |
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/actuator/health | jq -e '.status == "UP"' &&
+               docker compose logs --no-color app | grep 'coupon-persist: partitions assigned:' >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - name: Verify checkout and database rollback
+        shell: pwsh
+        run: ./scripts/verify-checkout.ps1
+      - name: Collect container logs
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop test environment
+        if: always()
+        run: docker compose down -v
+
+  release-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.9
+      - name: Install browser tests
+        working-directory: coupon/e2e
+        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Rehearse the release
+        shell: pwsh
+        run: ./scripts/verify-release.ps1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: coupon/e2e/test-results
+          if-no-files-found: ignore
