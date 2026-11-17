@@ -6,7 +6,7 @@
 
 ```powershell
 pnpm --dir e2e install --frozen-lockfile
-pnpm --dir e2e exec playwright install chromium
+pnpm --dir e2e exec playwright install chromium webkit
 ./scripts/verify-release.ps1
 ```
 

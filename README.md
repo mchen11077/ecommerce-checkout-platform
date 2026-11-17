@@ -65,11 +65,12 @@ The root [docker-compose.yml](docker-compose.yml) runs the coupon API with Postg
 
 ## Tests
 
-[GitHub Actions](.github/workflows/coupon.yml) runs JUnit, Vitest, checkout API checks, and a Chromium release rehearsal. The Java job uploads the JaCoCo report.
+[GitHub Actions](.github/workflows/coupon.yml) runs JUnit, Vitest, checkout API checks, and release rehearsals in Chromium and WebKit. The Java job uploads the JaCoCo report.
 
 - Run Java tests with `mvn -f app/pom.xml test`. Enable the [PostgreSQL checkout tests](app/src/test/java/com/coursework/coupon/CheckoutPostgresTest.java) with `CHECKOUT_TEST_JDBC_URL`, `CHECKOUT_TEST_DB_USER`, and `CHECKOUT_TEST_DB_PASSWORD`.
 - Use Node.js 22 for the [frontend tests and build](coupon-web/README.md).
 - See the [release guide](deploy/README.md) for the local browser rehearsal command.
+- Read the [QA results](docs/QA_REPORT.md) and [feature coverage matrix](docs/FEATURE_MATRIX.md) for the tested scope and remaining gaps.
 
 ## Image credits
 

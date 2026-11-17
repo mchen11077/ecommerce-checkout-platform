@@ -1,4 +1,7 @@
-param([switch]$KeepRunning)
+param(
+    [switch]$KeepRunning,
+    [ValidateSet('chromium', 'webkit')][string[]]$Browsers = @('chromium', 'webkit')
+)
 
 $ErrorActionPreference = 'Stop'
 $project = 'coupon-release-test-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
@@ -23,6 +26,23 @@ function Wait-For([string]$Description, [scriptblock]$Check) {
     throw "Timed out waiting for $Description"
 }
 
+function Reset-BrowserFixtures {
+    Invoke-Sql coupon @'
+TRUNCATE coupon_redemption, checkout_order, coupon_claim, coupon RESTART IDENTITY CASCADE;
+UPDATE product_inventory SET available = 20
+WHERE product_id IN ('silicone-utensils', 'nonstick-skillet', 'stainless-stockpot', 'glass-storage');
+'@
+    Invoke-Sql coupon (Get-Content -Raw 'deploy/rehearsal-seed.sql')
+}
+
+function Invoke-BrowserTests([string]$Browser, [string[]]$Files) {
+    Push-Location e2e
+    try {
+        pnpm exec playwright test @Files --workers=1 "--browser=$Browser"
+        if ($LASTEXITCODE -ne 0) { throw "$Browser browser acceptance failed" }
+    } finally { Pop-Location }
+}
+
 Push-Location (Join-Path $PSScriptRoot '..')
 try {
     Invoke-Compose up -d --build
@@ -31,25 +51,22 @@ try {
         $realm = Invoke-RestMethod 'http://localhost:8186/realms/coupons/.well-known/openid-configuration' -TimeoutSec 3
         $shop.StatusCode -eq 200 -and $realm.issuer -eq 'http://localhost:8186/realms/coupons'
     }
-    $seed = Get-Content -Raw 'deploy/rehearsal-seed.sql'
-    Invoke-Sql coupon $seed
-
-    Push-Location e2e
-    try {
-        pnpm exec playwright test shop.spec.ts --workers=1
-        if ($LASTEXITCODE -ne 0) { throw 'Browser acceptance failed' }
-    } finally { Pop-Location }
-
-    $inventory = Invoke-Sql coupon @'
+    foreach ($browser in $Browsers) {
+        Reset-BrowserFixtures
+        Invoke-BrowserTests $browser @('shop.spec.ts')
+        $inventory = Invoke-Sql coupon @'
 SELECT c.name || ':' || c.stock || ':' || count(cc.id)
 FROM coupon c LEFT JOIN coupon_claim cc ON cc.coupon_id = c.id
 WHERE c.name IN ('Release race offer', 'Release duplicate offer')
 GROUP BY c.id ORDER BY c.name;
 '@
-    if (($inventory -join ',') -ne 'Release duplicate offer:1:1,Release race offer:0:1') {
-        throw "Unexpected persisted inventory: $inventory"
+        if (($inventory -join ',') -ne 'Release duplicate offer:1:1,Release race offer:0:1') {
+            throw "Unexpected persisted inventory: $inventory"
+        }
+        Write-Host "PASS: $browser concurrent claim inventory and duplicate protection"
+        Reset-BrowserFixtures
+        Invoke-BrowserTests $browser @('checkout.spec.ts', 'interactions.spec.ts', 'responsive.spec.ts')
     }
-    Write-Host 'PASS: concurrent claim inventory and duplicate protection'
 
     Invoke-Sql postgres 'CREATE DATABASE coupon_legacy;'
     Invoke-Sql coupon_legacy @'

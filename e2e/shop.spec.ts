@@ -1,28 +1,8 @@
-import { devices, expect, test, type Page } from '@playwright/test';
+import { devices, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-
-const origin = 'http://localhost:5186';
+import { origin, signIn, test } from './fixtures';
 const offerName = 'Release checkout offer';
-
-test.beforeAll(async ({ request }) => {
-  await expect.poll(async () => {
-    const session = await request.get(`${origin}/api/session`);
-    const identity = await request.get('http://localhost:8186/realms/coupons/.well-known/openid-configuration');
-    return session.ok() && identity.ok();
-  }, { timeout: 30_000 }).toBe(true);
-});
-
-async function signIn(page: Page, account: 'a' | 'b') {
-  await page.goto(origin);
-  await page.getByRole('link', { name: 'Sign in', exact: true }).first().click();
-  await page.getByLabel('Username or email').fill(`shopper-${account}`);
-  await page.getByLabel('Password', { exact: true }).fill(
-    account === 'a' ? 'LocalShopperA-201!' : 'LocalShopperB-202!',
-  );
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-}
 
 test('accounts own their coupons and checkout survives a retry', async ({ browser }) => {
   const a = await browser.newPage();

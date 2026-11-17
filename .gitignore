@@ -1,5 +1,8 @@
 node_modules/
 dist/
+target/
+coverage/
+*.tsbuildinfo
 *.tgz
 
 # 本机依赖与缓存
