@@ -1,6 +1,7 @@
-﻿# Coupon coursework: build, start, run all experiments, write results\summary.md
+# Coupon coursework: build, start, run all experiments, write results\summary.md
 $ErrorActionPreference = "Continue"   # native tools (docker) write progress to stderr; we check $LASTEXITCODE instead
-Set-Location $PSScriptRoot
+$projectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $projectRoot
 
 # Keep the previous run: results\ is moved to results_prev_<time>\ before starting.
 if (Test-Path "results\summary.md") {
@@ -278,5 +279,5 @@ $env:CONSUMER_BATCH = "false"
 Out-Md ""
 
 docker compose logs app > results\app_log.txt
-Say "DONE. Results: $PSScriptRoot\results\summary.md"
+Say "DONE. Results: $projectRoot\results\summary.md"
 Stop-Transcript | Out-Null

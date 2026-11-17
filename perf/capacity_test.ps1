@@ -13,7 +13,7 @@ if ($Instances.Count -eq 0 -or ($Instances | Where-Object { $_ -lt 1 -or $_ -gt 
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $out = "perf\out"
 New-Item -ItemType Directory -Force $out | Out-Null
-$compose = @("-f", "docker-compose.yml", "-f", "docker-compose.scale.yml")
+$compose = @("-f", "docker-compose.yml", "-f", "deploy/docker-compose.scale.yml")
 $env:CONSUMER_AUTO_STARTUP = "false"
 
 function Compose { & docker compose @compose @args }

@@ -18,9 +18,9 @@ pnpm --dir e2e exec playwright install chromium
 4. 给镜像指定不可变的发布标签。备份数据库后运行发布命令。迁移成功后 Compose 启动应用，Nginx 提供构建好的静态前端。部署入口只有回环端口，由 HTTPS 入口转发。
 
 ```sh
-docker compose --env-file deploy/.env -f docker-compose.release.yml build
-docker compose --env-file deploy/.env -f docker-compose.release.yml run --rm migrate
-docker compose --env-file deploy/.env -f docker-compose.release.yml up -d --no-build
+docker compose --project-directory . --env-file deploy/.env -f deploy/docker-compose.release.yml build
+docker compose --project-directory . --env-file deploy/.env -f deploy/docker-compose.release.yml run --rm migrate
+docker compose --project-directory . --env-file deploy/.env -f deploy/docker-compose.release.yml up -d --no-build
 ```
 
 5. 在目标环境确认 HTTPS 登录、领取与结账正常，检查 Prometheus 抓取与告警。将告警转接到实际值班渠道。Prometheus 管理端口只在主机回环地址开放。生产反代应保留请求 ID，以便从浏览器响应关联 Nginx 日志。

@@ -2,8 +2,8 @@ param([switch]$KeepRunning)
 
 $ErrorActionPreference = 'Stop'
 $project = 'coupon-release-test-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
-$compose = @('compose', '-p', $project, '--env-file', 'deploy/rehearsal.env',
-    '-f', 'docker-compose.release.yml', '-f', 'docker-compose.rehearsal.yml')
+$compose = @('compose', '--project-directory', '.', '-p', $project, '--env-file', 'deploy/rehearsal.env',
+    '-f', 'deploy/docker-compose.release.yml', '-f', 'deploy/docker-compose.rehearsal.yml')
 
 function Invoke-Compose {
     & docker @compose @args

@@ -1,6 +1,6 @@
 @echo off
 REM Start the API first with docker compose up -d --build.
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 
 where pnpm >nul 2>&1
 if errorlevel 1 (

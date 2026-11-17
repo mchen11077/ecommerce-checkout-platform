@@ -1,6 +1,6 @@
 # Horizontal-scaling overlay: 3 stateless app replicas behind nginx, each capped at 2 vCPUs.
 #
-#   docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale app=3
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.scale.yml up -d --scale app=3
 #
 # The app's fixed host port is removed (!reset) because every replica would otherwise fight for 8080;
 # nginx owns 8080 and load-balances to the replicas through Docker DNS.
@@ -27,7 +27,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       app:
         condition: service_started

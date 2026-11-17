@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 set LOG=env_check.txt
 echo ==== env check %date% %time% > %LOG%
 echo [java] >> %LOG% & java -version >> %LOG% 2>&1

@@ -1,4 +1,4 @@
-﻿# Horizontal-scaling curve: 1 -> 2 -> 3 app replicas behind nginx, each capped at 2 vCPUs.
+# Horizontal-scaling curve: 1 -> 2 -> 3 app replicas behind nginx, each capped at 2 vCPUs.
 # Consumer listeners are stopped so the measurement isolates the synchronous claim path.
 # Usage: powershell -ExecutionPolicy Bypass -File perf\scale_test.ps1
 param(
@@ -17,7 +17,7 @@ if ($Instances.Count -eq 0 -or ($Instances | Where-Object { $_ -lt 1 -or $_ -gt 
 Set-Location (Split-Path $PSScriptRoot -Parent)
 $out = "perf\out"
 New-Item -ItemType Directory -Force $out | Out-Null
-$compose = @("-f", "docker-compose.yml", "-f", "docker-compose.scale.yml")
+$compose = @("-f", "docker-compose.yml", "-f", "deploy/docker-compose.scale.yml")
 $env:CONSUMER_AUTO_STARTUP = "false"
 
 function Compose { & docker compose @compose @args }

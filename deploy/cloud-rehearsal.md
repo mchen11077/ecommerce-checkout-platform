@@ -7,8 +7,8 @@ Run the same Docker Compose stack on one temporary Ubuntu VM per provider. Use s
 3. On the VM, from the repository root, run:
 
    ```sh
-   docker compose -p paw-cloud-rehearsal --env-file deploy/rehearsal.env -f docker-compose.release.yml -f docker-compose.rehearsal.yml up -d --build postgres keycloak migrate app web
-   docker compose -p paw-cloud-rehearsal --env-file deploy/rehearsal.env -f docker-compose.release.yml -f docker-compose.rehearsal.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U coupon -d coupon < deploy/retail-offers.sql
+   docker compose -p paw-cloud-rehearsal --project-directory . --env-file deploy/rehearsal.env -f deploy/docker-compose.release.yml -f deploy/docker-compose.rehearsal.yml up -d --build postgres keycloak migrate app web
+   docker compose -p paw-cloud-rehearsal --project-directory . --env-file deploy/rehearsal.env -f deploy/docker-compose.release.yml -f deploy/docker-compose.rehearsal.yml exec -T postgres psql -X -v ON_ERROR_STOP=1 -U coupon -d coupon < deploy/retail-offers.sql
    ```
 
 4. If the workstation already runs the local rehearsal, stop that stack before forwarding the same ports. From the workstation run `ssh -N -o ExitOnForwardFailure=yes -L 5186:127.0.0.1:5186 -L 8186:127.0.0.1:8186 ubuntu@VM_IP` (use the configured Azure username when applicable). Open http://localhost:5186. Verify guest checkout and sign-in, check an in-stock count before and after checkout, simulate a refund and confirm stock returns once, then use a different paid order to simulate shipment. Verify the shipped order cannot be refunded by this demo workflow.

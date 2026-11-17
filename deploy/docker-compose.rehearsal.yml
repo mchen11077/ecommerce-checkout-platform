@@ -22,7 +22,7 @@ services:
     ports:
       - "127.0.0.1:8186:8080"
     volumes:
-      - ./keycloak/coupons-realm.json:/opt/keycloak/data/import/coupons-realm.json:ro
+      - ./deploy/keycloak/coupons-realm.json:/opt/keycloak/data/import/coupons-realm.json:ro
 
   migrate:
     depends_on:
