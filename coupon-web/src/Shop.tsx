@@ -433,13 +433,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
     <main className="page shop">
       <header className="shop-header">
         <div>
-          <h1>
-            <span className="shop-paw-badge" aria-hidden="true">
-              <span className="shop-paw"><i /><i /><i /><i /></span>
-            </span>
-            <span>Paw &amp; Pantry</span>
-          </h1>
-          <p className="page__hint">Cat-paw cookware, tools and storage.</p>
+          <h1>Kitchenware Store</h1>
         </div>
         {session && (userId === null ? (
           <a className="shop-account" href={loginPath}>Sign in</a>

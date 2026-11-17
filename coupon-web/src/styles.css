@@ -293,56 +293,9 @@ body:has(.shop) {
   margin: 0 0 4px;
   font-size: clamp(24px, 4.8vw, 44px);
   letter-spacing: -0.04em;
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
 }
 
-.shop-paw-badge {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 1.3em;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.shop-paw {
-  position: relative;
-  display: inline-block;
-  flex: none;
-  width: 0.9em;
-  height: 0.85em;
-  color: #f6d8d5;
-  transform: rotate(-8deg);
-}
-
-.shop-paw i, .shop-paw::after {
-  position: absolute;
-  background: currentColor;
-  border-radius: 50%;
-}
-
-.shop-paw i { width: 20%; aspect-ratio: 1; }
-.shop-paw i:nth-child(1) { top: 28%; left: 2%; }
-.shop-paw i:nth-child(2) { top: 10%; left: 23%; }
-.shop-paw i:nth-child(3) { top: 10%; right: 23%; }
-.shop-paw i:nth-child(4) { top: 28%; right: 2%; }
-.shop-paw::after {
-  content: '';
-  width: 62%;
-  height: 46%;
-  inset: auto 19% 5%;
-  background:
-    radial-gradient(ellipse at center, currentColor 68%, transparent 72%) center top / 72% 85% no-repeat,
-    radial-gradient(circle, currentColor 67%, transparent 72%) left bottom / 45% 74% no-repeat,
-    radial-gradient(circle, currentColor 67%, transparent 72%) center bottom / 46% 74% no-repeat,
-    radial-gradient(circle, currentColor 67%, transparent 72%) right bottom / 45% 74% no-repeat;
-  border-radius: 0;
-}
-
-.shop .shop-header .page__hint, .shop-header a {
+.shop-header a {
   color: var(--ink);
 }
 

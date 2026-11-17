@@ -29,5 +29,20 @@ services:
       postgres:
         condition: service_healthy
 
+  seed:
+    image: postgres:16-alpine
+    profiles: [demo]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres
+      PGDATABASE: coupon
+      PGUSER: coupon
+      PGPASSWORD: ${COUPON_DB_MIGRATION_PASSWORD:?Set rehearsal environment}
+    volumes:
+      - ./deploy/retail-offers.sql:/sql/retail-offers.sql:ro
+    command: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", "/sql/retail-offers.sql"]
+
 volumes:
   database:
