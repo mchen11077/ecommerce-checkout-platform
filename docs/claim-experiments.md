@@ -140,10 +140,10 @@ nginx 用 `resolve` + Docker DNS 做服务发现，扩缩容不会留下失效�
 ## 怎么跑
 
 1. 打开 **Docker Desktop**，等左下角显示 *Engine running*。
-2. 双击 **`scripts/windows/1_run_all.bat`**。会先清掉旧容器和数据，再重新构建。所有实验加起来约 20 分钟。
+2. 双击 **`deploy/windows/1_run_all.bat`**。会先清掉旧容器和数据，再重新构建。所有实验加起来约 20 分钟。
 3. 结果在 **`results\summary.md`**；完整日志在 `results\run_log.txt` 和 `results\app_log.txt`。上一次的结果会自动移到 `results_prev_<时间>\`，不会被覆盖。
    `summary.md` 是上一次运行的快照；当前代码默认 `key=userId`、12 分区、6 个消费线程，重跑后 consumer 追平时间会和旧快照不同。
-4. 做完后双击 `scripts/windows/2_stop_and_clean.bat`，停掉容器并删除数据。
+4. 做完后双击 `deploy/windows/2_stop_and_clean.bat`，停掉容器并删除数据。
 5. 扩展/热路径实验单独跑，不影响课程实验：
 
 ```powershell
