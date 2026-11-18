@@ -7,18 +7,18 @@ A kitchenware shopping website built with React, TypeScript, and Spring Boot. Br
 ## Features
 
 - Browse products, manage a cart, and check out selected items as a guest or signed-in customer.
-- Claim coupons, check spending requirements, and apply discounts or gifts to an order.
+- Sign in to claim and use coupons for discounts or gifts. Guest checkout is available without coupons.
 - Review order history and try simulated payments, refunds, and shipping.
 
 ## Preview
 
 <table>
   <tr>
-    <th>Cart and checkout</th>
+    <th>Product catalog</th>
     <th>Order history</th>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/checkout.png" alt="Two selected products with a $10 coupon and a $65 total" width="480"></td>
+    <td><img src="docs/screenshots/storefront.png" alt="Kitchenware product catalog with category filters, prices, and add-to-cart buttons" width="480"></td>
     <td><img src="docs/screenshots/orders.png" alt="Order details with product images, receipt totals, and refund and shipment controls" width="480"></td>
   </tr>
 </table>
@@ -36,7 +36,14 @@ A kitchenware shopping website built with React, TypeScript, and Spring Boot. Br
 
 **Requirements:** Docker with Compose v2. The command below works in Bash and PowerShell; Java and Node.js run inside the build containers.
 
-From the repository root:
+Clone the repository and enter its directory:
+
+```sh
+git clone https://github.com/mchen11077/ecommerce-checkout-platform.git
+cd ecommerce-checkout-platform
+```
+
+Start the application:
 
 ```sh
 docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehearsal.env -f deploy/docker-compose.release.yml -f deploy/docker-compose.rehearsal.yml up -d --build postgres keycloak migrate app web seed
