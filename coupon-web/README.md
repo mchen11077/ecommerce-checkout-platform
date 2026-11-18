@@ -13,7 +13,7 @@ pnpm --dir coupon-web install --frozen-lockfile
 pnpm --dir coupon-web dev
 ```
 
-Vite serves the storefront on [localhost:5173](http://localhost:5173) and proxies API requests to `http://127.0.0.1:8080`. Use `COUPON_VITE_BACKEND` to change the proxy target. The local development storefront uses fixture customer 101. The [Docker storefront](../README.md#run-the-demo) uses Keycloak sessions and supports guest checkout.
+Vite serves the storefront on [localhost:5173](http://localhost:5173) and proxies API requests to `http://127.0.0.1:8080`. Use `COUPON_VITE_BACKEND` to change the proxy target. The local development storefront uses fixture customer 101. The [Docker storefront](../README.md#quick-start) uses Keycloak sessions and supports guest checkout.
 
 For local coupon API diagnostics, open `/?debug=1` in Vite development mode.
 
