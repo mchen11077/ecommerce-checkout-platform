@@ -55,16 +55,6 @@ docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehears
 
 </details>
 
-## Tests
-
-See the [testing guide](docs/QA_REPORT.md) for test commands and the [feature matrix](docs/FEATURE_MATRIX.md) for covered workflows.
-
-## Further documentation
-
-- [Frontend setup and component tests](coupon-web/README.md)
-- [TypeScript coupon client](coupon-client/README.md)
-- [Deployment configuration and release rehearsal](deploy/README.md)
-
 ## Image credits
 
 Product images are AI-generated concepts. See [image credits](coupon-web/public/photo-credits.html) for attribution and reference-photo licenses.
