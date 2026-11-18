@@ -10,12 +10,12 @@ services:
       PGSSLMODE: ${COUPON_DB_SSLMODE:-verify-full}
     volumes:
       - ./deploy/migrate.sql:/sql/deploy/migrate.sql:ro
-      - ./app/src/main/resources/schema.sql:/sql/app/src/main/resources/schema.sql:ro
+      - ./backend/src/main/resources/schema.sql:/sql/backend/src/main/resources/schema.sql:ro
     command: ["psql", "-X", "-f", "/sql/deploy/migrate.sql"]
 
   app:
     image: ${COUPON_APP_IMAGE:-coupon-release-app:local}
-    build: ./app
+    build: ./backend
     restart: unless-stopped
     depends_on:
       migrate:

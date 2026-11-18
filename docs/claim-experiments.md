@@ -48,7 +48,7 @@ Consumer 有两种落库方式（Step 4.4），用环境变量 `COUPON_CONSUMER_
 - `false`（默认）：每条消息一个事务、一条 INSERT
 - `true`：每次 poll 一个事务，一条多行 `INSERT ... ON CONFLICT DO NOTHING RETURNING`，再按券汇总扣库存，只扣真正插入的行数
 
-代码在 `app/src/main/java/com/coursework/coupon/`，Lua 脚本在 `app/src/main/resources/lua/`。
+代码在 `backend/src/main/java/com/coursework/coupon/`，Lua 脚本在 `backend/src/main/resources/lua/`。
 
 ## 瓶颈与水平扩展（新增，数字均为本机实测）
 

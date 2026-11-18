@@ -17,11 +17,11 @@ if not exist "coupon-client\dist\index.js" (
   if errorlevel 1 exit /b 1
 )
 
-if not exist "coupon-web\node_modules" (
-  call pnpm --dir coupon-web install --no-frozen-lockfile
+if not exist "frontend\node_modules" (
+  call pnpm --dir frontend install --no-frozen-lockfile
   if errorlevel 1 exit /b 1
 )
 
 echo Front end: http://localhost:5173
-call pnpm --dir coupon-web dev
+call pnpm --dir frontend dev
 pause

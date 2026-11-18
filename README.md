@@ -64,4 +64,4 @@ docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehears
 
 ## Image credits
 
-Product images are AI-generated concepts. See [image credits](coupon-web/public/photo-credits.html) for attribution and reference-photo licenses.
+Product images are AI-generated concepts. See [image credits](frontend/public/photo-credits.html) for attribution and reference-photo licenses.

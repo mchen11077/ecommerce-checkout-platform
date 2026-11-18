@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS coupon_schema_migration (
 );
 SELECT NOT EXISTS (SELECT FROM coupon_schema_migration WHERE version = 1) AS pending \gset
 \if :pending
-    \ir ../app/src/main/resources/schema.sql
+    \ir ../backend/src/main/resources/schema.sql
     INSERT INTO coupon_schema_migration (version) VALUES (1);
 \endif
 SELECT NOT EXISTS (SELECT FROM coupon_schema_migration WHERE version = 2) AS pending \gset
@@ -34,12 +34,12 @@ SELECT NOT EXISTS (SELECT FROM coupon_schema_migration WHERE version = 5) AS pen
 \endif
 SELECT NOT EXISTS (SELECT FROM coupon_schema_migration WHERE version = 6) AS pending \gset
 \if :pending
-    \ir ../app/src/main/resources/schema.sql
+    \ir ../backend/src/main/resources/schema.sql
     INSERT INTO coupon_schema_migration (version) VALUES (6);
 \endif
 SELECT NOT EXISTS (SELECT FROM coupon_schema_migration WHERE version = 7) AS pending \gset
 \if :pending
-    \ir ../app/src/main/resources/schema.sql
+    \ir ../backend/src/main/resources/schema.sql
     INSERT INTO coupon_schema_migration (version) VALUES (7);
 \endif
 COMMIT;
