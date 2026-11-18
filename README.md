@@ -1,77 +1,50 @@
 # E-Commerce Checkout Platform
 
-A full-stack commerce demo focused on coupon eligibility, redemption, and transactional checkout. The kitchenware storefront provides a concrete workflow for browsing products, managing a cart, applying discounts, and reviewing orders. Payment, refunds, and shipping are simulated.
+A kitchenware storefront built with React, TypeScript, Java 21, and Spring Boot. It supports product browsing, cart checkout, coupon claiming and redemption, and order history. Payments, refunds, and shipping are simulated.
+
+![Checkout with two products, a $10 coupon, and a $65 total](docs/screenshots/checkout.png)
+
+## Core features
+
+- **Cart and coupons:** select items, adjust quantities, claim discounts or gifts, and check eligibility against the selected cart.
+- **Retry-safe checkout:** the browser preserves the order request across a same-tab refresh. A unique `(user_id, order_id)` constraint lets the API return the original receipt without deducting inventory twice.
+- **Transactional inventory:** conditional stock updates and order creation share a PostgreSQL transaction. An unavailable item rolls back earlier deductions.
+- **Order lifecycle:** refunds and shipments lock the order before changing its state. A successful refund restores inventory once.
+- **Authentication:** Keycloak provides OpenID Connect sign-in; the API enforces account ownership and CSRF protection.
+
+Nginx serves the storefront and proxies the API. PostgreSQL stores orders, inventory, and coupon claims. A separate Redis/Kafka claim implementation supports the [performance experiments](perf/README.md).
 
 ## Run the demo
 
-Run this command from the repository root with Docker Compose v2. It works in Bash and PowerShell.
+Install Docker with Compose v2, then run from the repository root:
 
 ```sh
 docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehearsal.env -f deploy/docker-compose.release.yml -f deploy/docker-compose.rehearsal.yml up -d --build postgres keycloak migrate app web seed
 ```
 
-Open [localhost:5186](http://localhost:5186). The local-only demo account is `shopper-a` with password `LocalShopperA-201!`.
+Open [localhost:5186](http://localhost:5186). Sign in with the local demo account `shopper-a` / `LocalShopperA-201!`.
 
-Add the $50 skillet and $25 utensil set, claim **Kitchen starter savings**, and apply it at checkout. The $10 discount brings the total to **$65**. The receipt appears under **My orders**.
+Add the $50 skillet and $25 utensil set, claim **Kitchen starter savings**, and apply it at checkout. The total is **$65** after the $10 discount. Review the receipt in **My orders**, then try a simulated refund or shipment.
 
-Stop the demo with the same Compose options, replacing `up -d --build postgres keycloak migrate app web seed` with `stop`.
+To stop the demo:
 
-<details>
-<summary>Demo screenshots</summary>
+```sh
+docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehearsal.env -f deploy/docker-compose.release.yml -f deploy/docker-compose.rehearsal.yml stop
+```
 
-![Checkout with two selected products, a $10 coupon, and a $65 total](docs/screenshots/checkout.png)
+## Tests and performance
 
-![Order history showing the two line items and the $65 receipt](docs/screenshots/orders.png)
+[GitHub Actions](.github/workflows/coupon.yml) runs JUnit, Vitest, PostgreSQL integration checks, and Playwright tests in Chromium and WebKit. The backend job publishes JaCoCo coverage. See the [QA report](docs/QA_REPORT.md) and [feature matrix](docs/FEATURE_MATRIX.md) for verified behaviors, coverage, and remaining gaps.
 
-</details>
+In a local Docker/k6 experiment, increasing the synchronous claim service from one to three replicas raised throughput from 7,095 to 19,712 claims/s. This measured the claim API with the Kafka consumer disabled, not end-to-end storefront capacity. Environment, latency measurements, and consumer batching results are documented in the [benchmark report](perf/README.md).
 
-## Architecture
+## Development
 
-The React and TypeScript storefront talks to the Java 21 Spring Boot API through Nginx. Keycloak provides OpenID Connect sessions. PostgreSQL stores stock, orders, and each customer's coupon claim. Claiming a coupon reserves it for the customer. Redemption consumes one use when checkout succeeds.
-
-| Checkout case | Implementation |
-| --- | --- |
-| Retry after a lost response | The browser persists the order ID and selected items for a retry after same-tab refresh. PostgreSQL enforces a unique `(user_id, order_id)` key. Replaying the same request returns its original receipt. |
-| A cart item is out of stock | Inventory uses a conditional update with `available >= quantity`. A rejected line rolls back the order and earlier inventory updates in the same transaction. |
-| Refund and shipment arrive together | Both operations lock the order with `SELECT ... FOR UPDATE`. The first valid transition wins. A refund restores inventory once. |
-
-## Coupon claim experiments
-
-These results are from a separate local Docker/k6 benchmark. The synchronous claim test used 1,600 virtual users, 2 vCPUs per application replica, and disabled the Kafka consumer to isolate the API path.
-
-| Application replicas | Claims per second | p95 | p99 |
-| ---: | ---: | ---: | ---: |
-| 1 | 7,095 | 292.1 ms | 356.6 ms |
-| 3 | 19,712 | 164.4 ms | 215.1 ms |
-
-The browser acceptance test checks two concurrent claims against one available coupon and expects one success and zero excess claims.
-
-In a separate Kafka test with the same coupon ID key, batching database writes reduced consumer catch-up time from **86.7 s to 18.2 s**. See the [benchmark setup and results](perf/README.md) and [claim implementations](docs/claim-experiments.md).
-
-## Repository layout
-
-| Directory | Contents |
-| --- | --- |
-| [app](app) | Spring Boot API, checkout transactions, and PostgreSQL integration tests |
-| [coupon-web](coupon-web) | React storefront and component tests |
-| [coupon-client](coupon-client) | TypeScript client for coupon operations |
-| [deploy](deploy) | Storefront Compose files, Keycloak fixture, and SQL migrations |
-| [e2e](e2e) | Playwright storefront tests |
-| [perf](perf) | k6 workloads and benchmark scripts |
-| [scripts](scripts) | Local verification and experiment commands |
-| [docs](docs) | Claim experiments and supporting notes |
-
-The root [docker-compose.yml](docker-compose.yml) runs the coupon API with PostgreSQL, Redis, and Kafka. The Compose files in [deploy](deploy) run the browser storefront with Keycloak and PostgreSQL.
-
-## Tests
-
-[GitHub Actions](.github/workflows/coupon.yml) runs JUnit, Vitest, checkout API checks, and release rehearsals in Chromium and WebKit. The Java job uploads the JaCoCo report.
-
-- Run Java tests with `mvn -f app/pom.xml test`. Enable the [PostgreSQL checkout tests](app/src/test/java/com/coursework/coupon/CheckoutPostgresTest.java) with `CHECKOUT_TEST_JDBC_URL`, `CHECKOUT_TEST_DB_USER`, and `CHECKOUT_TEST_DB_PASSWORD`.
-- Use Node.js 22 for the [frontend tests and build](coupon-web/README.md).
-- See the [release guide](deploy/README.md) for the local browser rehearsal command.
-- Read the [QA results](docs/QA_REPORT.md) and [feature coverage matrix](docs/FEATURE_MATRIX.md) for the tested scope and remaining gaps.
+- [Storefront setup and component tests](coupon-web/README.md)
+- [TypeScript coupon client](coupon-client/README.md)
+- [Deployment configuration and release rehearsal](deploy/README.md)
+- [Coupon claim implementations](docs/claim-experiments.md)
 
 ## Image credits
 
-The catalog uses generated product concepts. See [image credits and reference-photo licenses](coupon-web/public/photo-credits.html).
+Product images are AI-generated concepts. Attribution and reference-photo licenses are listed in [image credits](coupon-web/public/photo-credits.html).
