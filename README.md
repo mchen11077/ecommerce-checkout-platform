@@ -68,8 +68,6 @@ Nginx serves the React storefront and proxies the Spring Boot API. Keycloak hand
 | Refund and shipment arrive together | Both operations lock the order with `SELECT ... FOR UPDATE` before changing its state. |
 | Another account requests an order | The API validates account ownership. Session-based writes also require CSRF protection. |
 
-The separate Redis/Kafka claim implementation supports performance comparisons. A local Docker/k6 experiment measured **7,095 claims/s with one replica** and **19,712 with three**, with the Kafka consumer disabled to isolate the synchronous claim API. See the [benchmark report](perf/README.md) for conditions, latency, and consumer batching results.
-
 ## Tests
 
 [CI](.github/workflows/coupon.yml) runs Java and frontend tests, PostgreSQL integration checks, and browser tests in Chromium and WebKit. The backend job publishes JaCoCo coverage.
