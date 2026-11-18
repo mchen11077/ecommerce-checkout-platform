@@ -1,8 +1,19 @@
 # E-Commerce Checkout Platform
 
+[![CI](https://github.com/mchen11077/ecommerce-checkout-platform/actions/workflows/coupon.yml/badge.svg?branch=main)](https://github.com/mchen11077/ecommerce-checkout-platform/actions/workflows/coupon.yml)
+
 A kitchenware shopping website built with React, TypeScript, and Spring Boot. Browse products, manage a cart, use coupons, and review orders. Payments, refunds, and shipping are simulated.
 
-[Features](#features) · [Preview](#preview) · [Quick start](#quick-start)
+[Engineering highlights](#engineering-highlights) · [Features](#features) · [Preview](#preview) · [Quick start](#quick-start)
+
+## Engineering highlights
+
+- **Atomic coupon claims:** the Redis comparison path uses Lua for stock checks, duplicate prevention, and rate limiting, with no SQL on the synchronous claim path.
+- **Kafka persistence:** claim events are written to PostgreSQL asynchronously with duplicate protection. Key-distribution and batching experiments identified contention on the shared coupon stock row; batching reduced catch-up time from 86.7 s to 18.2 s in the recorded same-key experiment.
+- **Horizontal scaling:** the recorded local k6 benchmark reached **7,095 claims/s with one replica** and **19,712 with three** at 1,600 virtual users and 2 vCPUs per replica. The Kafka consumer was disabled to isolate synchronous claim capacity.
+- **Transactional checkout:** order IDs make retries idempotent; failed inventory reservations roll back; refunds and shipments lock the order before changing its state.
+
+The Redis/Kafka benchmarks are separate from the PostgreSQL-backed storefront demo. See the [performance methodology and results](tests/performance/README.md) and [claim implementation notes](docs/claim-experiments.md) for the local setup and limitations.
 
 ## Features
 
@@ -31,6 +42,7 @@ A kitchenware shopping website built with React, TypeScript, and Spring Boot. Br
 | Frontend | React 19, TypeScript, Vite |
 | Backend | Java 21, Spring Boot, Spring Security, JDBC |
 | Data and authentication | PostgreSQL, Keycloak / OpenID Connect |
+| Claim experiments | Redis (Lua), Kafka, k6 |
 | Testing and tooling | JUnit, Vitest, Playwright, JaCoCo, Docker Compose, GitHub Actions |
 
 ## Quick start
