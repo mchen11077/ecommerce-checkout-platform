@@ -6,5 +6,5 @@ COPY src ./src
 RUN mvn -q -B package -DskipTests
 
 FROM eclipse-temurin:21-jre
-COPY --from=build /src/target/coupon-coursework.jar /app.jar
+COPY --from=build /src/target/ecommerce-checkout-platform.jar /app.jar
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app.jar"]

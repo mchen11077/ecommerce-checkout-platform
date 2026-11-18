@@ -1,10 +1,10 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coursework.coupon.CheckoutController.Item;
-import com.coursework.coupon.CheckoutController.OrderRequest;
-import com.coursework.coupon.CheckoutController.Receipt;
+import io.github.mchen11077.ecommerce.CheckoutController.Item;
+import io.github.mchen11077.ecommerce.CheckoutController.OrderRequest;
+import io.github.mchen11077.ecommerce.CheckoutController.Receipt;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

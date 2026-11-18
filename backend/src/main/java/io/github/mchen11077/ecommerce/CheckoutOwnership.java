@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

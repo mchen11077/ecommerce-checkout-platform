@@ -8,8 +8,8 @@
     <version>3.3.5</version>
     <relativePath/>
   </parent>
-  <groupId>com.coursework</groupId>
-  <artifactId>coupon-coursework</artifactId>
+  <groupId>io.github.mchen11077</groupId>
+  <artifactId>ecommerce-checkout-platform</artifactId>
   <version>1.0.0</version>
   <properties><java.version>21</java.version></properties>
   <dependencies>
@@ -26,7 +26,7 @@
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-test</artifactId><scope>test</scope></dependency>
   </dependencies>
   <build>
-    <finalName>coupon-coursework</finalName>
+    <finalName>ecommerce-checkout-platform</finalName>
     <plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins>
   </build>
 </project>

@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;

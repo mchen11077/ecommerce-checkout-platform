@@ -1,4 +1,4 @@
-# Coupon coursework: build, start, run all experiments, write results\summary.md
+# Coupon claim experiments: build, start, run all experiments, write results\summary.md
 $ErrorActionPreference = "Continue"   # native tools (docker) write progress to stderr; we check $LASTEXITCODE instead
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-Location $projectRoot
@@ -84,7 +84,7 @@ function Wait-Persisted($id, $maxSeconds) {
 # ---- Machine info ----
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
 $memGb = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
-Set-Content -Path $summary -Value "# Coupon coursework results" -Encoding UTF8
+Set-Content -Path $summary -Value "# Coupon claim experiment results" -Encoding UTF8
 Out-Md ""
 Out-Md "- Run at: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 Out-Md "- Machine: $($cpu.Name), $($cpu.NumberOfCores) cores / $($cpu.NumberOfLogicalProcessors) threads, $memGb GB RAM"

@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 public enum ClaimResult {
     OK(200), SOLD_OUT(409), ALREADY_CLAIMED(409), NOT_FOUND(404),

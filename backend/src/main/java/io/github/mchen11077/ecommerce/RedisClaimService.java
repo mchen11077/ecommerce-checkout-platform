@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;

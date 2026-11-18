@@ -30,7 +30,7 @@ function Wait-Persisted($id, $maxSeconds) {
   return -1
 }
 function Get-Offsets {
-  $lines = & docker exec coupon-coursework-kafka-1 /opt/kafka/bin/kafka-get-offsets.sh `
+  $lines = & docker compose exec -T kafka /opt/kafka/bin/kafka-get-offsets.sh `
     --bootstrap-server localhost:9092 --topic coupon-claimed 2>$null
   $m = @{}
   foreach ($l in $lines) {

@@ -20,7 +20,7 @@ function Wait-App {
   throw "app did not become healthy"
 }
 function EvalshaCalls {
-  $info = & docker exec coupon-coursework-redis-1 redis-cli INFO commandstats 2>$null
+  $info = & docker compose @compose exec -T redis redis-cli INFO commandstats 2>$null
   $line = $info | Select-String "cmdstat_evalsha:calls=(\d+)"
   if ($line -and $line.Matches.Count -gt 0) { return [long]$line.Matches[0].Groups[1].Value }
   return 0

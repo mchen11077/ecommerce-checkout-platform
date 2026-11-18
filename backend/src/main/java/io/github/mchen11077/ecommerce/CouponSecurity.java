@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;

@@ -17,7 +17,7 @@ Spring Boot app × N  (stateless, 2 vCPU each in the scale overlay)
              └──► ClaimEventConsumer (same JVM) ──► PostgreSQL（幂等落库，逐条或批量）
 ```
 
-Base `docker-compose.yml` 仍然是单实例、直接暴露 8080，`tests/performance/run-claim-experiments.ps1` 的课程实验不变。
+Base `docker-compose.yml` 仍然是单实例、直接暴露 8080，`tests/performance/run-claim-experiments.ps1` 的领券实验不变。
 `deploy/docker-compose.scale.yml` 是叠加层：去掉 app 的固定端口，加 nginx，给每个 app 副本 2 vCPU / 1.5 GB 上限。
 
 
@@ -35,7 +35,7 @@ Base `docker-compose.yml` 仍然是单实例、直接暴露 8080，`tests/perfor
 
 ## 三种领券实现（同一个接口，用 `mode` 参数切换）
 
-| mode | 做法 | 对应课程步骤 | 预期 |
+| mode | 做法 | 实验阶段 | 预期 |
 |---|---|---|---|
 | `naive` | SELECT 库存 → SELECT 是否已领 → UPDATE 库存 = 读到的值 - 1 → INSERT claim，共 4 条 SQL，不加锁 | Phase 1：Step 1.2 / 1.3 / 1.4 | **会超卖**（lost update） |
 | `lock` | 同样 4 条 SQL，外面包一层 Redis 分布式锁（`SET NX PX` + Lua compare-and-delete 释放） | Phase 2：Step 2.1 / 2.2 | 不超卖，但同一张券的请求被串行化，吞吐量低 |
@@ -48,7 +48,7 @@ Consumer 有两种落库方式（Step 4.4），用环境变量 `COUPON_CONSUMER_
 - `false`（默认）：每条消息一个事务、一条 INSERT
 - `true`：每次 poll 一个事务，一条多行 `INSERT ... ON CONFLICT DO NOTHING RETURNING`，再按券汇总扣库存，只扣真正插入的行数
 
-代码在 `backend/src/main/java/com/coursework/coupon/`，Lua 脚本在 `backend/src/main/resources/lua/`。
+代码在 `backend/src/main/java/io/github/mchen11077/ecommerce/`，Lua 脚本在 `backend/src/main/resources/lua/`。
 
 ## 瓶颈与水平扩展（新增，数字均为本机实测）
 
@@ -144,7 +144,7 @@ nginx 用 `resolve` + Docker DNS 做服务发现，扩缩容不会留下失效�
 3. 结果在 **`results\summary.md`**；完整日志在 `results\run_log.txt` 和 `results\app_log.txt`。上一次的结果会自动移到 `results_prev_<时间>\`，不会被覆盖。
    `summary.md` 是上一次运行的快照；当前代码默认 `key=userId`、12 分区、6 个消费线程，重跑后 consumer 追平时间会和旧快照不同。
 4. 做完后双击 `deploy/windows/2_stop_and_clean.bat`，停掉容器并删除数据。
-5. 扩展/热路径实验单独跑，不影响课程实验：
+5. 扩展/热路径实验单独跑，不影响领券实验：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests\performance\bottleneck.ps1          # Step 0 瓶颈采样

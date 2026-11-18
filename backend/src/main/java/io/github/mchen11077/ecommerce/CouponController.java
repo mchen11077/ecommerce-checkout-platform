@@ -1,4 +1,4 @@
-package com.coursework.coupon;
+package io.github.mchen11077.ecommerce;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;

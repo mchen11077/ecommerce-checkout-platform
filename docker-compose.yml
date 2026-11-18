@@ -1,4 +1,4 @@
-name: coupon-coursework
+name: ecommerce-checkout-platform
 services:
   postgres:
     image: postgres:16-alpine
