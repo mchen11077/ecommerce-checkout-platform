@@ -1,15 +1,14 @@
 # E-Commerce Checkout Platform
 
-A full-stack kitchenware storefront with coupon management and transactional checkout. Built with React, TypeScript, and Spring Boot. Payments, refunds, and shipping are simulated.
+A kitchenware shopping website built with React, TypeScript, and Spring Boot. Browse products, manage a cart, use coupons, and review orders. Payments, refunds, and shipping are simulated.
 
-[Quick start](#quick-start) · [Technical design](#technical-design) · [QA report](docs/QA_REPORT.md) · [Benchmarks](perf/README.md)
+[Features](#features) · [Preview](#preview) · [Quick start](#quick-start)
 
-## Highlights
+## Features
 
 - Browse products, manage a cart, and check out selected items as a guest or signed-in customer.
 - Claim coupons, check spending requirements, and apply discounts or gifts to an order.
-- Recover a checkout after a lost response or same-tab refresh without creating another order or deducting stock twice.
-- Review orders and simulate refunds or shipment, with inventory restored once on a successful refund.
+- Review order history and try simulated payments, refunds, and shipping.
 
 ## Preview
 
@@ -31,7 +30,6 @@ A full-stack kitchenware storefront with coupon management and transactional che
 | Frontend | React 19, TypeScript, Vite |
 | Backend | Java 21, Spring Boot, Spring Security, JDBC |
 | Data and authentication | PostgreSQL, Keycloak / OpenID Connect |
-| Claim experiments | Redis, Kafka, k6 |
 | Testing and tooling | JUnit, Vitest, Playwright, JaCoCo, Docker Compose, GitHub Actions |
 
 ## Quick start
@@ -57,29 +55,15 @@ docker compose --project-directory . -p ecommerce-demo --env-file deploy/rehears
 
 </details>
 
-## Technical design
-
-Nginx serves the React storefront and proxies the Spring Boot API. Keycloak handles sign-in. PostgreSQL stores product inventory, coupon claims, and orders.
-
-| Scenario | Implementation |
-| --- | --- |
-| Checkout response is lost | The browser preserves the original request. A unique `(user_id, order_id)` constraint allows a retry to return the existing receipt. |
-| An item is out of stock | Conditional stock updates and order creation share one transaction. A rejected item rolls back earlier deductions. |
-| Refund and shipment arrive together | Both operations lock the order with `SELECT ... FOR UPDATE` before changing its state. |
-| Another account requests an order | The API validates account ownership. Session-based writes also require CSRF protection. |
-
 ## Tests
 
-[CI](.github/workflows/coupon.yml) runs Java and frontend tests, PostgreSQL integration checks, and browser tests in Chromium and WebKit. The backend job publishes JaCoCo coverage.
-
-The [QA report](docs/QA_REPORT.md) records the latest local results and line and branch coverage. The [feature matrix](docs/FEATURE_MATRIX.md) identifies verified workflows and remaining gaps, including physical-device testing.
+See the [testing guide](docs/QA_REPORT.md) for test commands and the [feature matrix](docs/FEATURE_MATRIX.md) for covered workflows.
 
 ## Further documentation
 
 - [Frontend setup and component tests](coupon-web/README.md)
 - [TypeScript coupon client](coupon-client/README.md)
 - [Deployment configuration and release rehearsal](deploy/README.md)
-- [Coupon claim implementations](docs/claim-experiments.md)
 
 ## Image credits
 
