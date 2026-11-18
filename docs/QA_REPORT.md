@@ -43,9 +43,9 @@ The Java checkout class reaches 117 / 133 lines (87.97%) and 61 / 90 branches (6
 Install dependencies and browsers, then run the isolated release rehearsal from the repository root:
 
 ```powershell
-pnpm --dir e2e install --frozen-lockfile
-pnpm --dir e2e exec playwright install chromium webkit
-./scripts/verify-release.ps1
+pnpm --dir tests/e2e install --frozen-lockfile
+pnpm --dir tests/e2e exec playwright install chromium webkit
+./tests/verify-release.ps1
 ```
 
 The script creates a uniquely named Compose project, resets its own fixtures between browser suites, and removes that project's volumes when finished. Its default ports are 5186, 8186, and 9196; keep those available. This local run used a disposable copy with only those ports changed to 5686, 8686, and 9696 to preserve the existing preview.

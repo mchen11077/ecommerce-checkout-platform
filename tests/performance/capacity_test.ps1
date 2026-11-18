@@ -10,8 +10,8 @@ $Instances = @(@($Instances) | ForEach-Object { "$_" -split "," } | ForEach-Obje
 if ($Instances.Count -eq 0 -or ($Instances | Where-Object { $_ -lt 1 -or $_ -gt 6 })) {
   throw "Instances must be 1..6, got: $($Instances -join ',')"
 }
-Set-Location (Split-Path $PSScriptRoot -Parent)
-$out = "perf\out"
+Set-Location (Join-Path $PSScriptRoot '../..')
+$out = "tests\performance\out"
 New-Item -ItemType Directory -Force $out | Out-Null
 $compose = @("-f", "docker-compose.yml", "-f", "deploy/docker-compose.scale.yml")
 $env:CONSUMER_AUTO_STARTUP = "false"

@@ -1,6 +1,6 @@
 # Coupon coursework: build, start, run all experiments, write results\summary.md
 $ErrorActionPreference = "Continue"   # native tools (docker) write progress to stderr; we check $LASTEXITCODE instead
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-Location $projectRoot
 
 # Keep the previous run: results\ is moved to results_prev_<time>\ before starting.

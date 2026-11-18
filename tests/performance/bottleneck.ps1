@@ -1,13 +1,13 @@
 ﻿# Step 0: where does the single-machine stack actually saturate?
 # Runs the unmodified redis path at several fixed arrival rates and samples `docker stats`
-# during each run. Writes CSV samples + a markdown summary under perf\out\.
+# during each run. Writes CSV samples + a markdown summary under tests\performance\out\.
 param(
   [int[]]$Rates = @(6000, 12000, 20000),
   [int]$Seconds = 30
 )
 $ErrorActionPreference = "Continue"
-Set-Location (Split-Path $PSScriptRoot -Parent)
-$out = "perf\out"
+Set-Location (Join-Path $PSScriptRoot '../..')
+$out = "tests\performance\out"
 New-Item -ItemType Directory -Force $out | Out-Null
 
 function Wait-App {

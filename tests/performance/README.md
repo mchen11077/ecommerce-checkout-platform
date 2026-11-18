@@ -27,11 +27,11 @@
 运行示例：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File perf\bottleneck.ps1
-powershell -ExecutionPolicy Bypass -File perf\capacity_test.ps1 -Instances "1,2,3" -VUs 1600
-powershell -ExecutionPolicy Bypass -File perf\kafka_key_test.ps1 -Batch false
-powershell -ExecutionPolicy Bypass -File perf\kafka_key_test.ps1 -Batch true
-powershell -ExecutionPolicy Bypass -File perf\hotpath_test.ps1
+powershell -ExecutionPolicy Bypass -File tests\performance\bottleneck.ps1
+powershell -ExecutionPolicy Bypass -File tests\performance\capacity_test.ps1 -Instances "1,2,3" -VUs 1600
+powershell -ExecutionPolicy Bypass -File tests\performance\kafka_key_test.ps1 -Batch false
+powershell -ExecutionPolicy Bypass -File tests\performance\kafka_key_test.ps1 -Batch true
+powershell -ExecutionPolicy Bypass -File tests\performance\hotpath_test.ps1
 ```
 
 `-Instances` 的引号不能省。PowerShell `-File` 模式会把 `1,2,3` 当成一个 token 绑成整数 `123`；

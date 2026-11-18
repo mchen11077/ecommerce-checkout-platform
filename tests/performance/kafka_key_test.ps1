@@ -7,8 +7,8 @@ param(
   [string]$Batch = "false"
 )
 $ErrorActionPreference = "Continue"
-Set-Location (Split-Path $PSScriptRoot -Parent)
-$out = "perf\out"
+Set-Location (Join-Path $PSScriptRoot '../..')
+$out = "tests\performance\out"
 New-Item -ItemType Directory -Force $out | Out-Null
 $env:CONSUMER_BATCH = $Batch
 

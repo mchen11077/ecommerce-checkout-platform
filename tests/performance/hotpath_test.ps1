@@ -5,8 +5,8 @@ param(
   [int]$VUs = 1600
 )
 $ErrorActionPreference = "Continue"
-Set-Location (Split-Path $PSScriptRoot -Parent)
-$out = "perf\out"
+Set-Location (Join-Path $PSScriptRoot '../..')
+$out = "tests\performance\out"
 New-Item -ItemType Directory -Force $out | Out-Null
 $compose = @("-f", "docker-compose.yml", "-f", "deploy/docker-compose.scale.yml")
 $env:CONSUMER_AUTO_STARTUP = "false"

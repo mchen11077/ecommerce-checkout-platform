@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 export const origin = process.env.E2E_BASE_URL ?? 'http://localhost:5186';
 const identity = process.env.E2E_IDENTITY_URL ?? 'http://localhost:8186';
-const realm = JSON.parse(readFileSync('../deploy/keycloak/coupons-realm.json', 'utf8'));
+const realm = JSON.parse(readFileSync('../../deploy/keycloak/coupons-realm.json', 'utf8'));
 
 export const test = base.extend({
   page: async ({ page, request }, use) => {

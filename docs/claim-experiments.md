@@ -17,7 +17,7 @@ Spring Boot app × N  (stateless, 2 vCPU each in the scale overlay)
              └──► ClaimEventConsumer (same JVM) ──► PostgreSQL（幂等落库，逐条或批量）
 ```
 
-Base `docker-compose.yml` 仍然是单实例、直接暴露 8080，`scripts/run-claim-experiments.ps1` 的课程实验不变。
+Base `docker-compose.yml` 仍然是单实例、直接暴露 8080，`tests/performance/run-claim-experiments.ps1` 的课程实验不变。
 `deploy/docker-compose.scale.yml` 是叠加层：去掉 app 的固定端口，加 nginx，给每个 app 副本 2 vCPU / 1.5 GB 上限。
 
 
@@ -53,7 +53,7 @@ Consumer 有两种落库方式（Step 4.4），用环境变量 `COUPON_CONSUMER_
 ## 瓶颈与水平扩展（新增，数字均为本机实测）
 
 这一节回答三个问题：单机到底卡在哪、加副本能不能线性涨、热路径还有多少空间。
-完整方法、原始 CSV 和踩坑记录在 `perf/README.md`，结果在 `perf/out/`。
+完整方法、原始 CSV 和踩坑记录在 `tests/performance/README.md`，结果在 `tests/performance/out/`。
 
 ### Step 0：先量瓶颈，别先加机器
 
@@ -107,7 +107,7 @@ nginx 用 `resolve` + Docker DNS 做服务发现，扩缩容不会留下失效�
 逐条模式下每条消息一个事务，全部排队在这把行锁上，所以 1.7K/s 与分区数无关；
 批量模式把 500 条聚合成一次 UPDATE，才把追平从 86.7 s 降到 18.2 s（4.8×）。
 结论：key 要改（消除分区倾斜，为以后消费端并行做准备），但它不是这次吞吐的主因。
-详见 `perf/out/kafka_key.md`。
+详见 `tests/performance/out/kafka_key.md`。
 
 ### Step 2：热路径（合并 Lua / 虚拟线程）
 
@@ -147,14 +147,14 @@ nginx 用 `resolve` + Docker DNS 做服务发现，扩缩容不会留下失效�
 5. 扩展/热路径实验单独跑，不影响课程实验：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File perf\bottleneck.ps1          # Step 0 瓶颈采样
-powershell -ExecutionPolicy Bypass -File perf\capacity_test.ps1 -Instances "1,2,3" -VUs 1600
-powershell -ExecutionPolicy Bypass -File perf\kafka_key_test.ps1 -Batch false
-powershell -ExecutionPolicy Bypass -File perf\kafka_key_test.ps1 -Batch true
-powershell -ExecutionPolicy Bypass -File perf\hotpath_test.ps1
+powershell -ExecutionPolicy Bypass -File tests\performance\bottleneck.ps1          # Step 0 瓶颈采样
+powershell -ExecutionPolicy Bypass -File tests\performance\capacity_test.ps1 -Instances "1,2,3" -VUs 1600
+powershell -ExecutionPolicy Bypass -File tests\performance\kafka_key_test.ps1 -Batch false
+powershell -ExecutionPolicy Bypass -File tests\performance\kafka_key_test.ps1 -Batch true
+powershell -ExecutionPolicy Bypass -File tests\performance\hotpath_test.ps1
 ```
 
-结果写到 `perf\out\*.md`。`-File` 模式下 `-Instances` 必须带引号：`1,2,3` 会被 PowerShell 绑成一个整数 `123`
+结果写到 `tests\performance\out\*.md`。`-File` 模式下 `-Instances` 必须带引号：`1,2,3` 会被 PowerShell 绑成一个整数 `123`
 （这个坑真的创建过 123 个副本，脚本现在会拒绝大于 6 的值）。
 
 

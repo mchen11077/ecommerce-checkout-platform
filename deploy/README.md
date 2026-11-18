@@ -5,9 +5,9 @@
 安装 Docker Compose、Node 22 和 pnpm 10.34.9。运行以下命令。验收使用新命名的 Compose 项目、独立数据库和本地端口 5186、8186、9196。测试结束清理该项目。排查失败时可加 `-KeepRunning`，用脚本打印的项目名查看容器。
 
 ```powershell
-pnpm --dir e2e install --frozen-lockfile
-pnpm --dir e2e exec playwright install chromium webkit
-./scripts/verify-release.ps1
+pnpm --dir tests/e2e install --frozen-lockfile
+pnpm --dir tests/e2e exec playwright install chromium webkit
+./tests/verify-release.ps1
 ```
 
 ## 发布到目标环境

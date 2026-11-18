@@ -36,7 +36,7 @@ WHERE product_id IN ('silicone-utensils', 'nonstick-skillet', 'stainless-stockpo
 }
 
 function Invoke-BrowserTests([string]$Browser, [string[]]$Files) {
-    Push-Location e2e
+    Push-Location tests/e2e
     try {
         pnpm exec playwright test @Files --workers=1 "--browser=$Browser"
         if ($LASTEXITCODE -ne 0) { throw "$Browser browser acceptance failed" }
