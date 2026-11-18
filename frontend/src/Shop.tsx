@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CouponApiError, CouponClient } from '@xumeiqi/coupon-client';
+import { CouponApiError } from '@xumeiqi/coupon-client';
 import { isCartQuantity, MAX_QUANTITY, type CartLine } from './cart';
 import { ShoppingCart } from './components/ShoppingCart';
 import { formatMoney } from './formatMoney';
 import { copyFor } from './messages';
 import { clearPendingCheckout, readPendingCheckout, savePendingCheckout } from './pendingCheckout';
 import { useResourceList } from './useResourceList';
+import { useShopApi, type BrowserSession } from './useShopApi';
+import { ChoicePicker } from './components/ChoicePicker';
+export type { BrowserSession } from './useShopApi';
 import utensilPhoto from './assets/paw-utensils.webp';
 import skilletPhoto from './assets/paw-skillet.webp';
 import stockpotPhoto from './assets/paw-stockpot.webp';
@@ -50,20 +53,16 @@ interface Pricing {
   giftName?: string;
 }
 
-interface Product { id: string; name: string; cents: number; category: string; description: string }
+interface Product {
+  id: string; name: string; cents: number; category: string; description: string;
+  details?: { dimensions: string; material: string; care: string[] };
+}
 interface Receipt { orderId: string; pricing: Pricing }
 interface OrderSummary extends Receipt {
   createdAt: string;
   items: { name: string; quantity: number }[];
   paymentStatus: 'DEMO' | 'PAID' | 'REFUNDED';
   shippingStatus: 'UNSHIPPED' | 'SHIPPED';
-}
-
-export interface BrowserSession {
-  userId: string | null;
-  csrfHeader: string;
-  csrfParameter: string;
-  csrfToken: string;
 }
 
 const configuredApi = (import.meta.env.VITE_API_BASE ?? window.location.origin).replace(/\/+$/, '');
@@ -97,27 +96,13 @@ function selectedCartKey(lines: CartLine[]) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof CouponApiError ? copyFor(error.code).message : 'Could not reach the coupon service. Try again.';
+  return error instanceof CouponApiError ? copyFor(error.code).message : 'Could not reach the shop. Please try again.';
 }
 
 export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const userId = session ? (session.userId === null ? null : Number(session.userId)) : 101;
   const walletPath = `/api/users/${userId}/coupons`;
-  const { client, request } = useMemo(() => {
-    const baseUrl = session ? window.location.origin : configuredApi;
-    const send: typeof fetch = (input, options) => {
-      const headers = new Headers(options?.headers);
-      if (session && options?.method === 'POST') headers.set(session.csrfHeader, session.csrfToken);
-      return fetch(input, { ...options, headers });
-    };
-    async function request<T>(path: string, options?: RequestInit): Promise<T> {
-      const response = await send(baseUrl + path, options);
-      const body = await response.json();
-      if (!response.ok) throw new CouponApiError(body.result ?? 'UNKNOWN', response.status, body);
-      return body;
-    }
-    return { client: new CouponClient({ baseUrl, fetch: send }), request };
-  }, [session]);
+  const { client, request, sessionExpired } = useShopApi(session, configuredApi);
   const { items: products, status: productsLoad, reload: reloadProducts } =
     useResourceList<Product>(request, '/api/checkout/products');
   const { items: catalog, status: offersLoad, reload: reloadOffers } =
@@ -127,6 +112,16 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const [showAllOffers, setShowAllOffers] = useState(false);
   const [cart, setCart] = useState(readCart);
   const [category, setCategory] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('featured');
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    const filtered = products.filter(product => (!category || product.category === category)
+      && [product.name, product.category, product.description].join(' ').toLocaleLowerCase().includes(query));
+    if (sort !== 'featured') filtered.sort((a, b) =>
+      (sort === 'price-asc' ? a.cents - b.cents : b.cents - a.cents) || a.name.localeCompare(b.name));
+    return filtered;
+  }, [products, category, search, sort]);
   const [detailProduct, setDetailProduct] = useState<Product>();
   const productDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -138,6 +133,10 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const [stockRevision, setStockRevision] = useState(0);
   const [orderAction, setOrderAction] = useState<string>();
   const [orderActionError, setOrderActionError] = useState('');
+  const [failedOrderAction, setFailedOrderAction] = useState<{ orderId: string; action: 'refund' | 'ship' }>();
+  const orderActionInFlight = useRef(false);
+  const [orderFilter, setOrderFilter] = useState('ALL');
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
   const [orderPage, setOrderPage] = useState(0);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState(false);
@@ -158,6 +157,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const [pendingCheckout, setPendingCheckout] = useState(() => readPendingCheckout(userId));
   const submittingOrder = useRef(false);
   const cartLocked = busy || Boolean(pendingCheckout);
+  const [couponTime, setCouponTime] = useState(Date.now);
   const couponPicker = useRef<HTMLDetailsElement>(null);
   const couponTrigger = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -181,11 +181,12 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
     return () => document.removeEventListener('pointerdown', dismissCouponOptions);
   }, []);
 
-  const available = wallet.filter(({ status }) => status === 'AVAILABLE')
+  const isExpired = (coupon: Coupon) => Date.parse(coupon.validUntil) <= couponTime;
+  const available = wallet.filter(({ status, coupon }) => status === 'AVAILABLE' && !isExpired(coupon))
     .sort((a, b) => Date.parse(a.coupon.validUntil) - Date.parse(b.coupon.validUntil) || b.coupon.id - a.coupon.id);
   const upcoming = wallet.filter(({ status }) => status === 'UPCOMING');
-  const history = wallet.filter(({ status }) => status === 'REDEEMED' || status === 'EXPIRED');
-  const selected = available.find(({ coupon }) => coupon.id === couponId)?.coupon;
+  const history = wallet.filter(({ status, coupon }) => status === 'REDEEMED' || status === 'EXPIRED' || isExpired(coupon));
+  const selected = wallet.find(({ coupon }) => coupon.id === couponId)?.coupon;
   const selectedId = selected?.id;
   const lines = products.flatMap(product => {
     const line = cart.find(item => item.productId === product.id);
@@ -194,8 +195,10 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const checkedLines = lines.filter(line => line.checked);
   const cartKey = selectedCartKey(lines);
   const cartSubtotal = checkedLines.reduce((sum, line) => sum + line.product.cents * line.quantity, 0);
-  const currentQuote = quote?.couponId === selectedId && quote?.cartKey === cartKey ? quote?.pricing : undefined;
-  const checkoutBlocked = busy || Boolean(removeId);
+  const currentQuote: Pricing | undefined = selected && isExpired(selected) ? { result: 'EXPIRED', subtotalCents: cartSubtotal,
+    discountCents: 0, totalCents: cartSubtotal, shortfallCents: 0 }
+    : quote?.couponId === selectedId && quote?.cartKey === cartKey ? quote?.pricing : undefined;
+  const checkoutBlocked = busy || Boolean(removeId) || sessionExpired;
   const canStartCheckout = !checkoutBlocked && productsLoad === 'ready' && Boolean(cartKey)
     && (!selected || currentQuote?.result === 'ELIGIBLE');
   const subtotal = currentQuote?.subtotalCents ?? cartSubtotal;
@@ -206,7 +209,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   const walletStatus = new Map(wallet.map(({ coupon, status }) => [coupon.id, status]));
   const candidates = catalog.filter(coupon => {
     const status = walletStatus.get(coupon.id);
-    return (status ? status === 'AVAILABLE' : coupon.remainingStock !== 0)
+    return !isExpired(coupon) && (status ? status === 'AVAILABLE' : coupon.remainingStock !== 0)
       && (coupon.discountAmount > 0 || coupon.giftName);
   });
   const recommended = cartKey ? candidates.filter(coupon => minimumShortfall(coupon, cartSubtotal) === 0)
@@ -215,6 +218,16 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
     : undefined;
   const orderedOffers = recommended ? [recommended, ...catalog.filter(coupon => coupon.id !== recommended.id)] : catalog;
   const visibleOffers = showAllOffers ? orderedOffers : orderedOffers.slice(0, initialOfferCount);
+
+  useEffect(() => {
+    if (!selected || pendingCheckout) return;
+    const expiresAt = Date.parse(selected.validUntil);
+    if (!Number.isFinite(expiresAt) || expiresAt <= couponTime) return;
+    const check = () => setCouponTime(Date.now());
+    const timer = setTimeout(check, Math.min(Math.max(0, expiresAt - Date.now()) + 10, 2_147_483_647));
+    window.addEventListener('focus', check);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', check); };
+  }, [selectedId, selected?.validUntil, pendingCheckout, couponTime]);
 
   async function signOut(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -254,23 +267,27 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
     const controller = new AbortController();
     setOrdersLoading(true);
     setOrdersError(false);
-    request<OrderSummary[]>(`/api/checkout/users/${userId}/orders?offset=${orderPage * 20}`,
+    request<OrderSummary[]>(`/api/checkout/users/${userId}/orders?offset=${orderPage * 20}&limit=21&status=${orderFilter}`,
       { signal: controller.signal, cache: 'no-store' }).then(result => {
-      if (!controller.signal.aborted) setOrders(result);
+      if (!controller.signal.aborted) {
+        if (!result.length && orderPage > 0) { setOrderPage(page => page - 1); return; }
+        setOrders(result.slice(0, 20));
+        setHasMoreOrders(result.length > 20);
+      }
     }).catch(() => {
       if (!controller.signal.aborted) setOrdersError(true);
     }).finally(() => {
       if (!controller.signal.aborted) setOrdersLoading(false);
     });
     return () => controller.abort();
-  }, [request, userId, orderPage, orderRevision]);
+  }, [request, userId, orderPage, orderFilter, orderRevision]);
 
   useEffect(() => {
     if (userId === null || selectedId === undefined || !cartKey) return;
     const controller = new AbortController();
     setQuoteFailed(false);
     const query = new URLSearchParams({ userId: String(userId), couponId: String(selectedId), cart: cartKey });
-    request<Pricing>(`/api/checkout/quote?${query}`, { signal: controller.signal }).then((pricing) => {
+    request<Pricing>(`/api/checkout/quote?${query}`, { signal: controller.signal, cache: 'no-store' }).then((pricing) => {
       if (!controller.signal.aborted) setQuote({ couponId: selectedId, cartKey, pricing });
     }).catch(() => {
       if (!controller.signal.aborted) setQuoteFailed(true);
@@ -319,7 +336,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   }
 
   async function claim(coupon: Coupon) {
-    if (userId === null) return;
+    if (userId === null || sessionExpired) return;
     setBusy(true);
     setNotice('');
     try {
@@ -411,9 +428,11 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
   }
 
   async function updateDemoOrder(orderId: string, action: 'refund' | 'ship') {
-    if (orderAction || userId === null) return;
+    if (orderActionInFlight.current || userId === null || sessionExpired) return;
+    orderActionInFlight.current = true;
     setOrderAction(orderId);
     setOrderActionError('');
+    setFailedOrderAction(undefined);
     try {
       await request(`/api/checkout/users/${userId}/orders/${orderId}/${action}`, { method: 'POST' });
       setOrders(previous => previous.map(order => {
@@ -422,10 +441,14 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           ? { ...order, paymentStatus: 'REFUNDED' } : { ...order, shippingStatus: 'SHIPPED' };
       }));
       setStockRevision(value => value + 1);
+      setOrderRevision(value => value + 1);
     } catch (error) {
-      setOrderActionError(errorMessage(error));
+      const retryable = !(error instanceof CouponApiError) || error.status >= 500 || error.status === 429;
+      setOrderActionError(retryable ? 'Could not confirm this update. Retry to check its outcome safely.' : errorMessage(error));
+      if (retryable) setFailedOrderAction({ orderId, action });
       setOrderRevision(value => value + 1);
     } finally {
+      orderActionInFlight.current = false;
       setOrderAction(undefined);
     }
   }
@@ -455,6 +478,10 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           <a href="#checkout">Cart ({lines.reduce((count, line) => count + line.quantity, 0)})</a>
           <a href="#orders">My orders</a>
       </nav>
+      {sessionExpired && <div className="shop-session-alert" role="alert">
+        <p>Your session has expired or changed. Your cart and pending order are saved.</p>
+        <a className="shop-text-action" href={loginPath}>Sign in again</a>
+      </div>}
       <section className="card retail-catalog" id="products">
         <div className="retail-section-heading">
           <h2>Shop kitchenware</h2>
@@ -465,13 +492,23 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
               {name || 'All products'}
             </button>)}
         </div>}
-        {productsLoad === 'loading' && products.length === 0 && <p>Loading products…</p>}
+        {products.length > 0 && <div className="retail-catalog-tools">
+          <label className="retail-search">Search products
+            <input type="search" value={search} placeholder="Search kitchenware" onChange={event => setSearch(event.target.value)} />
+          </label>
+          <ChoicePicker label="Sort products" value={sort} onChange={setSort} options={[
+            { value: 'featured', label: 'Featured' }, { value: 'price-asc', label: 'Price: low to high' },
+            { value: 'price-desc', label: 'Price: high to low' },
+          ]} />
+          <p role="status">{filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}</p>
+        </div>}
+        {productsLoad === 'loading'  && products.length === 0 && <p>Loading products…</p>}
         {productsLoad === 'error' && <div>
           <p role="alert">Could not load products.</p>
           <button type="button" onClick={reloadProducts}>Retry products</button>
         </div>}
         <div className="retail-products">
-          {products.filter(product => !category || product.category === category).map(product =>
+          {filteredProducts.map(product =>
             <article className="retail-product" key={product.id}>
               <button className="retail-product-preview" type="button"
                 aria-label={`View ${product.name} details`} aria-haspopup="dialog"
@@ -491,6 +528,10 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                 aria-label={`Add ${product.name} to cart`} onClick={() => addToCart(product)}>Add to cart</button>
             </article>)}
         </div>
+        {productsLoad === 'ready' && products.length > 0 && filteredProducts.length === 0 && <div className="retail-empty">
+          <p>No products match your search and category.</p>
+          <button type="button" onClick={() => { setSearch(''); setCategory(''); }}>Clear filters</button>
+        </div>}
         <p className="retail-photo-note">Product concept images. <a href="./photo-credits.html">Image credits</a></p>
         {cartNotice && <div className="retail-cart-notice">
           <p role="status">{cartNotice}</p><a href="#checkout">View cart</a>
@@ -502,6 +543,22 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           <h2 id="product-detail-title">{detailProduct?.name}</h2>
           <form method="dialog"><button type="submit">Close</button></form>
         </div>
+        {detailProduct && <div className="retail-detail-content">
+          {productImages[detailProduct.id] && <img src={productImages[detailProduct.id]} alt={detailProduct.name} />}
+          <div>
+            <p>{detailProduct.category}</p><p>{detailProduct.description}</p>
+            <strong className="retail-detail-price">{formatMoney(detailProduct.cents)}</strong>
+            {detailProduct.details && <>
+              <dl><dt>Size and capacity</dt><dd>{detailProduct.details.dimensions}</dd>
+                <dt>Materials</dt><dd>{detailProduct.details.material}</dd></dl>
+              <h3>Care instructions</h3><ul>{detailProduct.details.care.map(tip => <li key={tip}>{tip}</li>)}</ul>
+            </>}
+            {stock[detailProduct.id] !== undefined && <p>{stock[detailProduct.id] === 0 ? 'Out of stock' : `${stock[detailProduct.id]} in stock`}</p>}
+            <button type="button" className="button-primary" disabled={cartLocked || Boolean(removeId)
+              || stock[detailProduct.id] === 0 || cart.some(line => line.productId === detailProduct.id && line.quantity === MAX_QUANTITY)}
+              onClick={() => { addToCart(detailProduct); productDialog.current?.close(); }}>Add to cart</button>
+          </div>
+        </div>}
       </dialog>
       <div className="shop-layout">
         <div className="shop-column">
@@ -535,7 +592,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                   <a className="shop-claim shop-claim-login" href={loginPath}>
                     Sign in to claim
                   </a>
-                ) : <button className="shop-claim" type="button" disabled={cartLocked || walletLoad === 'loading' || Boolean(status) || soldOut} onClick={() => void claim(coupon)}>
+                ) : <button className="shop-claim" type="button" disabled={cartLocked || sessionExpired || walletLoad === 'loading' || Boolean(status) || soldOut} onClick={() => void claim(coupon)}>
                   {status === 'REDEEMED' ? 'Used' : status ? 'Claimed' : soldOut ? 'Sold out' : 'Claim offer'}
                 </button>}
               </article>;
@@ -551,7 +608,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           </section>
           <section className="card" id="wallet">
             <div className="catalog-heading"><h2>My coupons</h2>
-              {userId !== null && <button type="button" disabled={cartLocked || walletLoad === 'loading'} onClick={refresh}>Refresh</button>}
+              {userId !== null && <button type="button" disabled={cartLocked || sessionExpired || walletLoad === 'loading'} onClick={refresh}>Refresh</button>}
             </div>
             {userId === null
               ? <div className="shop-account-prompt"><p>See your claimed coupons and remaining uses.</p>
@@ -566,7 +623,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                 <p>Ends {new Date(coupon.validUntil).toLocaleDateString()}</p>
                 {(coupon.maxUsesPerUser ?? 1) > 1 && <p>{remainingUses} of {coupon.maxUsesPerUser} uses left</p>}
               </div>
-              <button className="shop-use" type="button" disabled={cartLocked || walletLoad !== 'ready'}
+              <button className="shop-use" type="button" disabled={cartLocked || sessionExpired || walletLoad !== 'ready'}
                 aria-label={`Use ${coupon.name} at checkout`}
                 onClick={() => {
                   chooseCoupon(coupon.id);
@@ -612,7 +669,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
               </summary>
               <div className="shop-coupon-options" role="group" aria-label="Coupon choices">
                 {[{ id: 0, name: 'No coupon selected' }, ...available.map(({ coupon }) => coupon)].map(option =>
-                  <button key={option.id} type="button" disabled={cartLocked || walletLoad !== 'ready'}
+                  <button key={option.id} type="button" disabled={cartLocked || sessionExpired || walletLoad !== 'ready'}
                     aria-pressed={(selectedId ?? 0) === option.id} onClick={() => {
                       chooseCoupon(option.id);
                       couponPicker.current?.removeAttribute('open');
@@ -626,7 +683,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
             <p>{currentQuote ? copyFor(currentQuote.result).message
               : quoteFailed ? 'Could not check this coupon.' : 'Checking coupon eligibility…'}</p>
             {shortfall > 0 && <p>{formatMoney(shortfall)} away from the minimum.</p>}
-            {quoteFailed && <button type="button" onClick={() => {
+            {quoteFailed && <button type="button" disabled={sessionExpired} onClick={() => {
               setQuoteFailed(false);
               setQuoteRevision(value => value + 1);
             }}>Retry coupon check</button>}
@@ -642,7 +699,7 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           </dl>}
           {pendingCheckout ? <div className="shop-coupon-reminder">
             <p role="status">{busy ? 'Checking your order…' : 'Your last order has no confirmation yet. Retry to check it before changing your cart.'}</p>
-            <button className="button-primary" type="button" disabled={busy} onClick={() => void placeOrder()}>Retry order</button>
+            <button className="button-primary" type="button" disabled={busy || sessionExpired} onClick={() => void placeOrder()}>Retry order</button>
           </div> : showCouponReminder ? <div className="shop-coupon-reminder">
             <p role="status">You have a coupon available for this order.</p>
             <div className="shop-reminder-actions">
@@ -677,9 +734,20 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
           </div>
         </section>
       </div>
-      <section className="card retail-orders" id="orders">
+      <section className="card retail-orders" id="orders" aria-busy={ordersLoading}>
         <h2>My orders</h2>
-        {orderActionError && <p role="alert">{orderActionError}</p>}
+        {userId !== null && <ChoicePicker label="Order status" value={orderFilter} disabled={Boolean(orderAction)}
+          onChange={value => { if (value !== orderFilter) { setOrders([]); setOrderFilter(value); setOrderPage(0); } }} options={[
+            { value: 'ALL', label: 'All orders' }, { value: 'UNSHIPPED', label: 'Awaiting shipment' },
+            { value: 'SHIPPED', label: 'Shipped' }, { value: 'REFUNDED', label: 'Refunded' },
+          ]} />}
+        {orderActionError && <div className="retail-action-error" role="alert"><p>{orderActionError}</p>
+          {failedOrderAction && <button type="button" disabled={Boolean(orderAction) || sessionExpired}
+            onClick={() => void updateDemoOrder(failedOrderAction.orderId, failedOrderAction.action)}>
+            Retry {failedOrderAction.action === 'refund' ? 'refund' : 'shipment'}
+          </button>}
+        </div>}
+        {orderAction && <p role="status">Updating order…</p>}
         {userId === null && <div className="shop-account-prompt"><p>Find your past orders and receipts here.</p>
           <a className="shop-text-action" href={loginPath}>Sign in to view orders <span aria-hidden="true">→</span></a>
         </div>}
@@ -687,8 +755,8 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
         {ordersError && <p role="alert">Could not load orders. <button type="button"
           onClick={() => setOrderRevision(value => value + 1)}>Retry</button></p>}
         {userId !== null && !ordersLoading && !ordersError && orders.length === 0 &&
-          <p>{orderPage === 0 ? 'You have no orders yet.' : 'There are no more orders.'}</p>}
-        {!ordersLoading && !ordersError && orders.map(order => <details className="retail-order" key={order.orderId}>
+          <p>{orderFilter !== 'ALL' ? 'No orders match this status.' : orderPage === 0 ? 'You have no orders yet.' : 'There are no more orders.'}</p>}
+        {!ordersError && orders.map(order => <details className="retail-order" key={order.orderId}>
           <summary>
             <span className="retail-order-heading">
               <b>Order {order.orderId.slice(0, 8)}</b>
@@ -723,18 +791,19 @@ export default function Shop({ session }: { session?: BrowserSession } = {}) {
                   <span data-state={order.shippingStatus}>{order.shippingStatus === 'SHIPPED' ? 'Shipped · simulated' : 'Not shipped'}</span>
                 </div>
                 {order.paymentStatus === 'PAID' && order.shippingStatus === 'UNSHIPPED' && <div className="shop-reminder-actions">
-                  <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'refund')}>Simulate refund</button>
-                  <button type="button" disabled={Boolean(orderAction)} onClick={() => void updateDemoOrder(order.orderId, 'ship')}>Simulate shipment</button>
+                  <button type="button" disabled={Boolean(orderAction) || sessionExpired} onClick={() => void updateDemoOrder(order.orderId, 'refund')}>Simulate refund</button>
+                  <button type="button" disabled={Boolean(orderAction) || sessionExpired} onClick={() => void updateDemoOrder(order.orderId, 'ship')}>Simulate shipment</button>
                 </div>}
               </>}
             </div>
           </div>
         </details>)}
-        {userId !== null && (orderPage > 0 || orders.length === 20) && <div className="retail-order-pages">
-          <button type="button" disabled={ordersLoading || orderPage === 0}
-            onClick={() => setOrderPage(page => page - 1)}>Newer orders</button>
-          <button type="button" disabled={ordersLoading || ordersError || orders.length < 20}
-            onClick={() => setOrderPage(page => page + 1)}>Older orders</button>
+        {userId !== null && (orderPage > 0 || hasMoreOrders) && <div className="retail-order-pages">
+          <button type="button" disabled={ordersLoading || Boolean(orderAction) || orderPage === 0}
+            onClick={() => { setOrders([]); setOrderPage(page => page - 1); }}>Newer orders</button>
+          <span aria-live="polite">Page {orderPage + 1}</span>
+          <button type="button" disabled={ordersLoading || Boolean(orderAction) || ordersError || !hasMoreOrders}
+            onClick={() => { setOrders([]); setOrderPage(page => page + 1); }}>Older orders</button>
         </div>}
       </section>
     </main>

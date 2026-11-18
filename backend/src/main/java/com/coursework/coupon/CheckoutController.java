@@ -29,7 +29,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/checkout")
 public class CheckoutController {
     private static final long GUEST_ORDER_OWNER = 0;
-    public record Product(String id, String name, int cents, String category, String description) {}
+    public record ProductDetails(String dimensions, String material, List<String> care) {}
+    public record Product(String id, String name, int cents, String category, String description,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) ProductDetails details) {}
     public record Pricing(String result, int subtotalCents, int discountCents, int totalCents, long shortfallCents,
                           @JsonInclude(JsonInclude.Include.NON_NULL) String giftName) {}
     public record Item(String productId, int quantity) {}
@@ -43,16 +45,24 @@ public class CheckoutController {
 
     private static final List<Product> PRODUCTS = List.of(
             new Product("silicone-utensils", "Silicone utensil set", 2500, "Kitchen tools",
-                    "Three heat-resistant utensils with soft edges for nonstick cookware."),
+                    "Three heat-resistant utensils with soft edges for nonstick cookware.",
+                    new ProductDetails("Three utensils, approximately 28–31 cm long", "Silicone heads and handles",
+                            List.of("Wash with warm water and mild soap.", "Dry before storing; keep away from open flames."))),
             new Product("nonstick-skillet", "Nonstick skillet", 5000, "Cookware",
-                    "A 10-inch skillet with a stay-cool handle for everyday cooking."),
+                    "A 10-inch skillet with a stay-cool handle for everyday cooking.",
+                    new ProductDetails("10-inch diameter", "Aluminum body, nonstick coating, and soft-grip handle",
+                            List.of("Hand wash with a soft sponge after cooling.", "Use silicone or wooden utensils; avoid metal tools."))),
             new Product("stainless-stockpot", "Stainless steel stockpot", 7500, "Cookware",
-                    "A 6-quart stainless steel pot with a lid for soups, stock and batch cooking."),
+                    "A 6-quart stainless steel pot with a lid for soups, stock and batch cooking.",
+                    new ProductDetails("6-quart capacity", "Stainless steel body with a coated exterior and fitted lid",
+                            List.of("Wash after cooling with a non-abrasive sponge.", "Dry thoroughly before storing."))),
             new Product("glass-storage", "Glass storage set", 3500, "Food storage",
-                    "Three stackable glass containers with snap-lock lids."));
+                    "Three stackable glass containers with snap-lock lids.",
+                    new ProductDetails("Three containers: 400 ml, 650 ml, and 1,000 ml", "Glass bases and snap-lock polymer lids",
+                            List.of("Remove lids before reheating.", "Avoid sudden temperature changes and let glass cool before washing."))));
     private static final Map<String, Product> LEGACY_PRODUCTS = Map.of(
-            "canvas-tote", new Product("canvas-tote", "Canvas tote", 5000, null, null),
-            "weekender-bag", new Product("weekender-bag", "Weekender bag", 12000, null, null));
+            "canvas-tote", new Product("canvas-tote", "Canvas tote", 5000, null, null, null),
+            "weekender-bag", new Product("weekender-bag", "Weekender bag", 12000, null, null, null));
 
     private final JdbcTemplate jdbc;
     private final RedemptionService redemption;
@@ -77,23 +87,34 @@ public class CheckoutController {
 
     @GetMapping("/users/{userId}/orders")
     public List<OrderSummary> orders(@PathVariable long userId,
-                                     @RequestParam(defaultValue = "0") int offset) {
+                                     @RequestParam(defaultValue = "0") int offset,
+                                     @RequestParam(defaultValue = "ALL") String status,
+                                     @RequestParam(defaultValue = "20") int limit) {
         if (userId <= 0) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        if (offset < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order offset");
+        if (offset < 0 || limit < 1 || limit > 21) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order page");
+        }
+        String filter = switch (status) {
+            case "ALL" -> "";
+            case "UNSHIPPED" -> " AND payment_status = 'PAID' AND shipping_status = 'UNSHIPPED'";
+            case "SHIPPED" -> " AND shipping_status = 'SHIPPED'";
+            case "REFUNDED" -> " AND payment_status = 'REFUNDED'";
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid order status");
+        };
         return jdbc.query("""
                 SELECT order_id, created_at, product_id, coupon_id, subtotal_cents, discount_cents, gift_name, cart_items,
                        payment_status, shipping_status
-                FROM checkout_order WHERE user_id = ?
+                FROM checkout_order WHERE user_id = ?%s
                 ORDER BY created_at DESC, order_id DESC
-                LIMIT 20 OFFSET ?
-                """, (row, index) -> {
+                LIMIT ? OFFSET ?
+                """.formatted(filter), (row, index) -> {
             var receipt = readReceipt(row, row.getObject("order_id", UUID.class));
             var items = receiptItems(receipt).stream()
                     .map(item -> new OrderLine(product(item.productId()).name(), item.quantity()))
                     .toList();
             return new OrderSummary(receipt.orderId(), row.getObject("created_at", OffsetDateTime.class),
                     items, receipt.pricing(), row.getString("payment_status"), row.getString("shipping_status"));
-        }, userId, offset);
+        }, userId, limit, offset);
     }
 
     @GetMapping("/quote")

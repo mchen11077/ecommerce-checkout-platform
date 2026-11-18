@@ -75,7 +75,7 @@ class CheckoutPostgresTest {
         assertResponse(checkout.confirm(USER, id, request), HttpStatus.CONFLICT, "INSUFFICIENT_STOCK");
         assertThat(stock(SKILLET)).isEqualTo(skilletBefore);
         assertThat(stock(UTENSILS)).isEqualTo(1);
-        assertThat(checkout.orders(USER, 0)).isEmpty();
+        assertThat(checkout.orders(USER, 0, "ALL", 20)).isEmpty();
         assertThat(redemptionCount()).isZero();
         assertThat(jdbc.queryForObject("SELECT use_count FROM coupon_claim", Integer.class)).isZero();
 
@@ -87,7 +87,7 @@ class CheckoutPostgresTest {
             assertThat(receipt.pricing().totalCents()).isEqualTo(8_000);
         });
         assertThat(checkout.confirm(USER, id, request)).isEqualTo(retry);
-        assertThat(checkout.orders(USER, 0)).hasSize(1);
+        assertThat(checkout.orders(USER, 0, "ALL", 20)).hasSize(1);
         assertThat(stock(SKILLET)).isEqualTo(skilletBefore - 1);
         assertThat(stock(UTENSILS)).isZero();
         assertThat(redemptionCount()).isEqualTo(1);
@@ -120,13 +120,62 @@ class CheckoutPostgresTest {
 
         assertResponse(action(id, winner), HttpStatus.OK, winner);
         assertResponse(action(id, loser), HttpStatus.CONFLICT, "ORDER_ACTION_UNAVAILABLE");
-        assertThat(checkout.orders(USER, 0)).singleElement().satisfies(order -> {
+        assertThat(checkout.orders(USER, 0, "ALL", 20)).singleElement().satisfies(order -> {
             assertThat(order.orderId()).isEqualTo(id);
             assertThat(order.paymentStatus()).isEqualTo(payment);
             assertThat(order.shippingStatus()).isEqualTo(shipment);
         });
         assertThat(stock(SKILLET)).isEqualTo(skilletBefore - stockDeducted);
         assertThat(stock(UTENSILS)).isEqualTo(utensilsBefore - 2 * stockDeducted);
+    }
+
+    @Test
+    void filtersAndPaginatesOrdersWithStableTiesAndAccountIsolation() {
+        for (int index = 1; index <= 26; index++) {
+            jdbc.update("""
+                    INSERT INTO checkout_order (user_id, order_id, product_id, subtotal_cents, discount_cents,
+                        payment_status, shipping_status, created_at)
+                    VALUES (?, ?, ?, 5000, 0, ?, ?, '2026-01-01T00:00:00Z')
+                    """, USER, new UUID(0, index), SKILLET, index <= 3 ? "REFUNDED" : "PAID",
+                    index > 3 && index <= 6 ? "SHIPPED" : "UNSHIPPED");
+        }
+        jdbc.update("""
+                INSERT INTO checkout_order (user_id, order_id, product_id, subtotal_cents, discount_cents)
+                VALUES (?, ?, ?, 5000, 0)
+                """, USER + 1, UUID.randomUUID(), SKILLET);
+        var first = checkout.orders(USER, 0, "ALL", 20);
+        var second = checkout.orders(USER, 20, "ALL", 20);
+        assertThat(first).hasSize(20);
+        assertThat(second).hasSize(6);
+        assertThat(first.getFirst().orderId()).isEqualTo(new UUID(0, 26));
+        assertThat(first.stream().map(CheckoutController.OrderSummary::orderId)).doesNotContainAnyElementsOf(
+                second.stream().map(CheckoutController.OrderSummary::orderId).toList());
+        assertThat(checkout.orders(USER, 0, "ALL", 21)).hasSize(21);
+        assertThat(checkout.orders(USER, 0, "REFUNDED", 21)).hasSize(3)
+                .allMatch(order -> order.paymentStatus().equals("REFUNDED"));
+        assertThat(checkout.orders(USER, 0, "SHIPPED", 21)).hasSize(3)
+                .allMatch(order -> order.shippingStatus().equals("SHIPPED"));
+        assertThat(checkout.orders(USER, 0, "UNSHIPPED", 21)).hasSize(20)
+                .allMatch(order -> order.paymentStatus().equals("PAID") && order.shippingStatus().equals("UNSHIPPED"));
+    }
+
+    @Test
+    void expiredAfterQuoteDoesNotCreateAnOrderOrConsumeStockOrCoupon() {
+        long coupon = jdbc.queryForObject("""
+                INSERT INTO coupon (name, total_stock, stock, status, min_order_amount, discount_amount)
+                VALUES ('Expiring offer', 1, 1, 'ACTIVE', 50, 5) RETURNING id
+                """, Long.class);
+        jdbc.update("INSERT INTO coupon_claim (coupon_id, user_id, source) VALUES (?, ?, 'TEST')", coupon, USER);
+        assertThat(checkout.quoteRequest(USER, SKILLET, coupon, null).result()).isEqualTo("ELIGIBLE");
+        jdbc.update("UPDATE coupon SET valid_until = now() - interval '1 second' WHERE id = ?", coupon);
+        int before = stock(SKILLET);
+        var response = checkout.confirm(USER, UUID.randomUUID(),
+                new OrderRequest(null, coupon, List.of(new Item(SKILLET, 1))));
+        assertResponse(response, HttpStatus.CONFLICT, "EXPIRED");
+        assertThat(stock(SKILLET)).isEqualTo(before);
+        assertThat(checkout.orders(USER, 0, "ALL", 20)).isEmpty();
+        assertThat(redemptionCount()).isZero();
+        assertThat(jdbc.queryForObject("SELECT use_count FROM coupon_claim", Integer.class)).isZero();
     }
 
     private void awaitBlockedBy(int ownerPid) {

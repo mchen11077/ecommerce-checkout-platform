@@ -65,7 +65,7 @@ GROUP BY c.id ORDER BY c.name;
         }
         Write-Host "PASS: $browser concurrent claim inventory and duplicate protection"
         Reset-BrowserFixtures
-        Invoke-BrowserTests $browser @('checkout.spec.ts', 'interactions.spec.ts', 'responsive.spec.ts')
+        Invoke-BrowserTests $browser @('checkout.spec.ts', 'features.spec.ts', 'interactions.spec.ts', 'responsive.spec.ts')
     }
 
     Invoke-Sql postgres 'CREATE DATABASE coupon_legacy;'

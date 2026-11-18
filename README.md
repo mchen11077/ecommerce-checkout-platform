@@ -6,9 +6,10 @@ A kitchenware shopping website built with React, TypeScript, and Spring Boot. Br
 
 ## Features
 
-- Browse products, manage a cart, and check out selected items as a guest or signed-in customer.
+- Search kitchenware, filter by category, sort by price, and view product specifications and care instructions.
+- Manage a cart and check out selected items as a guest or signed-in customer.
 - Sign in to claim and use coupons for discounts or gifts. Guest checkout is available without coupons.
-- Review order history and try simulated payments, refunds, and shipping.
+- Filter and page through order history, and try simulated payments, refunds, and shipping.
 
 ## Preview
 

@@ -1,6 +1,8 @@
 package com.coursework.coupon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
@@ -14,6 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 class CheckoutControllerTest {
     private static final long USER_ID = 101;
@@ -61,6 +64,23 @@ class CheckoutControllerTest {
 
         assertEquals(new CheckoutController.Pricing("EXPIRED", 12000, 0, 12000, 0, null), quote);
         verifyNoInteractions(jdbc);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"-1, ALL, 20", "0, ALL, 0", "0, ALL, 22", "0, UNKNOWN, 20"})
+    void rejectsInvalidOrderPagesAndStatusBeforeQuerying(int offset, String status, int limit) {
+        assertThrows(ResponseStatusException.class, () -> checkout.orders(USER_ID, offset, status, limit));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void publicProductsIncludeSpecificationsAndCareInstructions() {
+        assertEquals(4, checkout.products().size());
+        checkout.products().forEach(product -> {
+            assertFalse(product.details().dimensions().isBlank());
+            assertFalse(product.details().material().isBlank());
+            assertFalse(product.details().care().isEmpty());
+        });
     }
 
     private void couponTerms(String minimum, String discount) {

@@ -29,6 +29,7 @@ const COPY: Record<string, Copy> = {
   NOT_ISSUED: { message: 'This coupon has not been issued yet.', tone: 'warn' },
   COUPON_NOT_FOUND: { message: 'There is no coupon with that ID.', tone: 'bad' },
   NOT_FOUND: { message: 'There is no coupon with that ID.', tone: 'bad' },
+  SESSION_EXPIRED: { message: 'Your session expired. Sign in again; your cart and pending order are saved.', tone: 'warn' },
   FORBIDDEN: { message: 'You do not have access to this coupon or order.', tone: 'bad' },
   ORDER_CONFLICT: { message: 'This order ID is already in use for a different checkout.', tone: 'warn' },
 
